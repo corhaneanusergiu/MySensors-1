@@ -5,6 +5,10 @@
   V1.1 - Messages only for the correct sensor ID are processed
 */
 
+#include <SPI.h>
+
+//*** MY SENSORS ******************************************
+
 // Enable debug prints to serial monitor
 #define MY_DEBUG
 
@@ -24,9 +28,9 @@
 // Enable repeater functionality for this node
 // #define MY_REPEATER_FEATURE
 
-// Include additional libraries
-#include <SPI.h>
 #include <MySensor.h>
+
+//*** CONFIG **********************************************
 
 // Define relay settings
 #define RELAY_PIN 3 // Arduino Digital I/O pin number for first relay (second on pin+1 etc)
@@ -41,6 +45,8 @@ MyMessage msg1(CHILD_ID1, V_LIGHT);
 
 // EPPROM variable storage
 bool lastState;
+
+//*********************************************************
 
 void setup()
 {
