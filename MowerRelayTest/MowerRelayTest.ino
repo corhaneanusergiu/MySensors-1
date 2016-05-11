@@ -4,10 +4,7 @@
   V1.0 - Initial release.
 */
 
-#include <SPI.h>
-#include <MySensor.h>
-
-//*** CONFIG **********************************************
+//*** MY SENSORS ******************************************
 
 // Enable debug prints to serial monitor
 #define MY_DEBUG
@@ -28,7 +25,11 @@
 // Enable repeater functionality for this node
 // #define MY_REPEATER_FEATURE
 
+#include <MySensor.h>
+
 //*********************************************************
+
+#include <SPI.h>
 
 void setup()
 {
