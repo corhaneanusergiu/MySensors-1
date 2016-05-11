@@ -12,11 +12,13 @@
   V2.2 - Added mower relay activate / deactivate logic
 */
 
-/*
-  CURRENT VARIABLE SETTINGS
-  Moisture Trigger Level: 800
+#include <SPI.h>
+#include <BH1750.h>
+#include <NewPing.h>
+#include <Adafruit_NeoPixel.h>
+#include <elapsedMillis.h>
 
-*/
+//*** MY SENSORS ******************************************
 
 // Enable debug prints
 // #define MY_DEBUG
@@ -37,6 +39,10 @@
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
 
+#include <MySensor.h>
+
+//*** CONFIG **********************************************
+
 // Define radio wait time between sends
 #define RADIO_PAUSE 50 // This allows the radio to settle between sends, ideally 0...
 
@@ -45,14 +51,6 @@
 
 // Define time between sensors blocks
 #define SENSORS_DELAY 100  // This allows sensor VCC to settle between readings, ideally 0...
-
-// Include additional libraries
-#include <SPI.h>
-#include <MySensor.h>
-#include <BH1750.h>
-#include <NewPing.h>
-#include <Adafruit_NeoPixel.h>
-#include <elapsedMillis.h>
 
 #define NEO_PIN 2
 #define NUM_LEDS 8
@@ -157,6 +155,8 @@ MyMessage msg10(CHILD_ID10, V_TRIPPED);
 MyMessage msg11(CHILD_ID11, V_TRIPPED);
 MyMessage msg12(CHILD_ID12, V_CUSTOM);
 
+//*********************************************************
+
 void setup()
 {
 #ifdef MOISTURE_MODE_D
@@ -211,8 +211,10 @@ void presentation()
 
 void loop()
 {
+
+  //*** MOISTURE SENSOR DIGITAL *****************************
+
 #ifdef MOISTURE_MODE_D
-  //--- Digital Moisture sensor ---//
   digitalWrite(MOISTURE_POWER_PIN, HIGH); // Turn moisture power pin on
   wait(200); // Set a delay to ensure the moisture sensor has powered up
   int moistureValue = digitalRead(DIGITAL_INPUT_MOISTURE); // Read digital moisture value
@@ -231,8 +233,9 @@ void loop()
   }
 #endif
 
+  //*** MOISTURE SENSOR ANALOG ******************************
+
 #ifdef MOISTURE_MODE_A
-  //--- Analog Moisture sensor ---//
   total = total - reading[readIndex]; // Subtract the last smoothing reading
   digitalWrite(MOISTURE_POWER_PIN, HIGH); // Turn moisture power pin on
   wait(200); // Set a delay to ensure the moisture sensor has powered up
@@ -282,9 +285,11 @@ void loop()
   }
 #endif
 
-  wait(SENSORS_DELAY); // Wait between sensor readings, seems to help reliability of readings
+  wait(SENSORS_DELAY); // Wait after sensor readings
 
-  //--- Rain sensor ---//
+
+  //*** RAIN SENSOR *****************************************
+
   digitalWrite(RAIN_POWER_PIN, HIGH); // Turn rain power pin on
   wait(200); // Set a delay to ensure the moisture sensor has powered up
   int rainValue = digitalRead(DIGITAL_INPUT_RAIN); // Read digital rain value
@@ -302,10 +307,12 @@ void loop()
     lastRainValue = rainValue; // For testing can be 0 or 1 or back to rainValue
   }
 
-  wait(SENSORS_DELAY); // Wait between sensor readings, seems to help reliability of readings
+  wait(SENSORS_DELAY); // Wait after sensor readings
 
-  //--- Light sensor ---//
+  //*** LUX SENSOR ******************************************
+
   uint16_t lux = lightSensor.readLightLevel(); // Get Lux value
+
 #if COMPARE_LUX == 1
   if (lux != lastlux)
 #endif
@@ -319,9 +326,11 @@ void loop()
     lastlux = lux;
   }
 
-  wait(SENSORS_DELAY); // Wait between sensor readings, seems to help reliability of readings
+  wait(SENSORS_DELAY); // Wait between sensor readings
 
-  //--- Distance sensor ---//
+
+  //*** DISTANCE SENSOR *************************************
+
   int dist = metric ? sonar.ping_cm() : sonar.ping_in();
 #if COMPARE_DIST == 1
   if (dist != lastDist)
@@ -337,7 +346,8 @@ void loop()
     lastDist = dist;
   }
 
-  //--- Analyse readings, set Neopixels, booleans, and send gateway status messages ---//
+  //*** ANALYSE, SET, SEND TO GATEWAY ***********************
+
   if (lastMoistureValue == 0 || lastRainValue == 0)
   {
     send(MyMessage(1, V_LIGHT).setDestination(4).set(true)); // Send message to mower node to activate relay
