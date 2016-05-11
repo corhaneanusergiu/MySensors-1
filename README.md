@@ -1,1 +1,3 @@
 # MySensors
+
+# Some basic sensors that I'm working on...
