@@ -4,6 +4,11 @@
   V1.0 - Initial release.
 */
 
+#include <SPI.h>
+#include <MySensor.h>
+
+//*** CONFIG **********************************************
+
 // Enable debug prints to serial monitor
 #define MY_DEBUG
 
@@ -23,9 +28,7 @@
 // Enable repeater functionality for this node
 // #define MY_REPEATER_FEATURE
 
-// Include additional libraries
-#include <SPI.h>
-#include <MySensor.h>
+//*********************************************************
 
 void setup()
 {
@@ -33,6 +36,8 @@ void setup()
 
 void loop()
 {
+
+  // *** RELAY TRIGGER TEST **********************************************
 
   send(MyMessage(1, V_LIGHT).setDestination(4).set(true));
   delay(2000);
