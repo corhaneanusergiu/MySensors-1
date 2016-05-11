@@ -77,9 +77,9 @@ void presentation()
 
 void loop()
 {
-    
+
   //*** DS18B20 *******************************************
-    
+
   sensors.requestTemperatures(); // Fetch temperatures from Dallas sensors
   int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution()); // Query conversion time and sleep until conversion completed
   wait(conversionTime); // Sleep() call can be replaced by wait() call if node need to process incoming messages (or if node is repeater)
@@ -97,7 +97,7 @@ void loop()
       wait(500); // If set to sleeping, will still have time to wait for OTA messages...
       lastTemperature[i] = temperature; // Save new temperatures for next compare
     }
-    }
+  }
 
-sleep(LOOP_TIME); // Sleep or wait (repeater)
+  sleep(LOOP_TIME); // Sleep or wait (repeater)
 }

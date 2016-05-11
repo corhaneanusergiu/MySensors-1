@@ -6,6 +6,11 @@
   V1.3 - Corrected sensor child ID bug.
 */
 
+#include <SPI.h>
+#include <DHT.h>
+
+//*** MY SENSORS ******************************************
+
 // Enable debug prints
 // #define MY_DEBUG
 
@@ -25,9 +30,9 @@
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
 
-#include <SPI.h>
 #include <MySensor.h>
-#include <DHT.h>
+
+//*** CONFIG **********************************************
 
 // Define DHT22 pin
 #define DHT_DIGITAL_PIN 3
@@ -60,6 +65,8 @@ MyMessage msg1(CHILD_ID1, V_TEMP);
 MyMessage msg2(CHILD_ID2, V_HUM);
 MyMessage msg3(CHILD_ID3, V_TRIPPED);
 
+//*********************************************************
+
 void setup()
 {
   dht.setup(DHT_DIGITAL_PIN);
@@ -79,9 +86,14 @@ void presentation()
 
 void loop()
 {
+
+  //*** DHT SENSOR ****************************************
+
   wait(dht.getMinimumSamplingPeriod()); // Delay or wait (repeater)
+
   // Fetch temperatures from DHT sensor
   float temperature = dht.getTemperature();
+
   if (isnan(temperature))
   {
     Serial.println("Failed reading temperature from DHT");
@@ -104,6 +116,7 @@ void loop()
 
   // Fetch humidity from DHT sensor
   float humidity = dht.getHumidity();
+
   if (isnan(humidity))
   {
 #ifdef MY_DEBUG
@@ -122,8 +135,11 @@ void loop()
 #endif
   }
 
+  //*** PIR SENSOR ****************************************
+
   // Read digital motion value
   boolean tripped = digitalRead(PIR_DIGITAL_PIN) == HIGH;
+
 #ifdef MY_DEBUG
   Serial.print("PIR: ");
   Serial.println(tripped);
