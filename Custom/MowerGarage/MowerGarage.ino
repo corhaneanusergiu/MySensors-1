@@ -1,14 +1,14 @@
 /*
   REVISION HISTORY
   Created by Mark Swift
-  V1.4 - Reversed waiting LED logic.
-  V1.5 - Added analog moisture option.
+  V1.4 - Reversed waiting LED logic
+  V1.5 - Added analog moisture option
   V1.6 - Added analog moisture reading gateway message
   V1.7 - Added analog smoothing
   V1.8 - Shortened Sketch Name (Prevent send presentation errors)
   V1.9 - Moved LED to a seperate function
   V2.0 - Corrected presentation function
-  V2.1 - Preventing moisture readings being set or sent until analog smoothing in place.
+  V2.1 - Preventing moisture readings being set or sent until analog smoothing in place
   V2.2 - Added mower relay activate / deactivate logic
 */
 

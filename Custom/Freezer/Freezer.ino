@@ -1,8 +1,9 @@
 /*
   REVISION HISTORY
   Created by Mark Swift
-  V1.1 - Started code clean up.
-  V1.2 - Cleaned up.
+  V1.1 - Started code clean up
+  V1.2 - Cleaned up
+  V1.3 - Changed sleep to smartSleep to allow for future developments
 */
 
 #include <SPI.h>
@@ -67,7 +68,7 @@ void setup()
 
 void presentation()
 {
-  sendSketchInfo("Garage Freezer", "1.1"); // Send the sketch version information to the gateway and Controller
+  sendSketchInfo("Garage Freezer", "1.3"); // Send the sketch version information to the gateway and Controller
   numSensors = sensors.getDeviceCount(); // Fetch the number of attached temperature sensors
   for (int i = 0; i < numSensors && i < MAX_ATTACHED_DS18B20; i++) // Present all sensors to controller
   {
@@ -94,10 +95,10 @@ void loop()
     {
 #endif
       send(msg.setSensor(i).set(temperature, 1)); // Send in the new temperature
-      wait(500); // If set to sleeping, will still have time to wait for OTA messages...
+      // wait(500); // If set to sleeping, will still have time to wait for OTA messages...
       lastTemperature[i] = temperature; // Save new temperatures for next compare
     }
   }
 
-  sleep(LOOP_TIME); // Sleep or wait (repeater)
+  smartSleep(LOOP_TIME); // Sleep or wait (repeater)
 }
