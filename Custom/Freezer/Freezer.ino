@@ -3,7 +3,7 @@
   Created by Mark Swift
   V1.1 - Started code clean up
   V1.2 - Cleaned up
-  V1.3 - Changed sleep to smartSleep to allow for future developments
+  V1.3 - Changed sleep to smartSleep to allow for future developments // Cancelled for now as doesn't work so well!
 */
 
 #include <SPI.h>
@@ -16,7 +16,7 @@
 // #define MY_DEBUG
 
 #define MY_NODE_ID 2
-#define MY_PARENT_NODE_ID 1 // AUTO
+// #define MY_PARENT_NODE_ID 1 // AUTO
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -95,10 +95,10 @@ void loop()
     {
 #endif
       send(msg.setSensor(i).set(temperature, 1)); // Send in the new temperature
-      // wait(500); // If set to sleeping, will still have time to wait for OTA messages...
+      wait(500); // If set to sleeping, will still have time to wait for OTA messages...
       lastTemperature[i] = temperature; // Save new temperatures for next compare
     }
   }
 
-  smartSleep(LOOP_TIME); // Sleep or wait (repeater)
+  sleep(LOOP_TIME); // Sleep or wait (repeater)
 }
