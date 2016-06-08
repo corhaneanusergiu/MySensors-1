@@ -10,6 +10,7 @@
   V2.0 - Corrected presentation function
   V2.1 - Preventing moisture readings being set or sent until analog smoothing in place
   V2.2 - Added mower relay activate / deactivate logic
+  V2.3 - Added message failure retry function
 */
 
 #include <SPI.h>
@@ -47,7 +48,10 @@
 //*** CONFIG **********************************************
 
 // Define radio wait time between sends
-#define RADIO_PAUSE 50 // This allows the radio to settle between sends, ideally 0...
+#define RADIO_PAUSE 0 // This allows the radio to settle between sends, ideally 0...
+
+// Define radio retries upon failure
+int radioRetries = 5;
 
 // Define end of loop pause time
 #define LOOP_PAUSE 60000
@@ -55,6 +59,7 @@
 // Define time between sensors blocks
 #define SENSORS_DELAY 200  // This allows sensor VCC to settle between readings, ideally 0...
 
+// Define NeoPixel settings
 #define NEO_PIN 2
 #define NUM_LEDS 8
 Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(NUM_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
@@ -78,8 +83,8 @@ int moistureValue = -1;
 const int numReadings = 10; // The number of samples to keep track of
 int reading[numReadings]; // The readings from the analog input
 int readIndex = 0; // The index of the current reading
-int total = 0; // The running total
-int average = 0; // The Average
+int total = 0; // The running total reading
+int average = 0; // The average reading
 boolean readingsReady = false; // Only start sending readings once smoothing is complete
 #endif
 
@@ -214,7 +219,6 @@ void presentation()
 
 void loop()
 {
-
   //*** MOISTURE SENSOR DIGITAL *****************************
 
 #ifdef MOISTURE_MODE_D
@@ -230,7 +234,7 @@ void loop()
     Serial.print("Moisture: ");
     Serial.println(moistureValue == 0 ? 1 : 0);
 #endif
-    send(msg1.set(moistureValue == 0 ? 1 : 0)); // Send the inverse
+    resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
     wait(RADIO_PAUSE);
     lastMoistureValue = moistureValue; // For testing can be 0 or 1 or back to moistureValue
   }
@@ -279,7 +283,7 @@ void loop()
     Serial.println(average);
 #endif
     {
-      send(msg1.set(moistureValue == 0 ? 1 : 0)); // Send the inverse
+      resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
       wait(RADIO_PAUSE);
       send(msg2.set(average));
       wait(RADIO_PAUSE);
@@ -289,7 +293,6 @@ void loop()
 #endif
 
   wait(SENSORS_DELAY); // Wait after sensor readings
-
 
   //*** RAIN SENSOR *****************************************
 
@@ -305,7 +308,7 @@ void loop()
     Serial.print("Rain: ");
     Serial.println(rainValue == 0 ? 1 : 0); // Print the inverse
 #endif
-    send(msg3.set(rainValue == 0 ? 1 : 0)); // Send the inverse
+    resend(msg3.set(rainValue == 0 ? 1 : 0), radioRetries); // Send the inverse
     wait(RADIO_PAUSE);
     lastRainValue = rainValue; // For testing can be 0 or 1 or back to rainValue
   }
@@ -324,13 +327,12 @@ void loop()
     Serial.print("LUX: ");
     Serial.println(lux);
 #endif
-    send(msg4.set(lux));
+    resend(msg4.set(lux), radioRetries);
     wait(RADIO_PAUSE);
     lastlux = lux;
   }
 
   wait(SENSORS_DELAY); // Wait between sensor readings
-
 
   //*** DISTANCE SENSOR *************************************
 
@@ -344,7 +346,7 @@ void loop()
     Serial.print(dist); // Convert ping time to distance in cm and print result (0 = outside set distance range)
     Serial.println(metric ? " cm" : " in");
 #endif
-    send(msg5.set(dist));
+    resend(msg5.set(dist), radioRetries);
     wait(RADIO_PAUSE);
     lastDist = dist;
   }
@@ -353,10 +355,10 @@ void loop()
 
   if (lastMoistureValue == 0 || lastRainValue == 0)
   {
-    send(MyMessage(1, V_LIGHT).setDestination(4).set(true)); // Send message to mower node to activate relay
-    wait(RADIO_PAUSE);
-    send(MyMessage(1, V_LIGHT).setDestination(4).set(false)); // Send message to mower node to deactivate relay, as the timer will now be running
-    wait(RADIO_PAUSE);
+    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(true),radioRetries); // Send message to mower node to activate relay
+    // wait(RADIO_PAUSE);
+    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(false),radioRetries); // Send message to mower node to deactivate relay, as the timer will now be running
+    // wait(RADIO_PAUSE);
     landroidWaiting = true;
     landroidWaitingTriggered = true;
     timeElapsed = 0;
@@ -541,7 +543,7 @@ void loop()
   Serial.print(")");
   Serial.print(" status: ");
 #endif
-  send(msg10.set(landroidHome));
+  resend(msg10.set(landroidHome), radioRetries);
   wait(RADIO_PAUSE);
 
   // Send Landroid waiting status to gateway
@@ -552,7 +554,7 @@ void loop()
   Serial.print(")");
   Serial.print(" status: ");
 #endif
-  send(msg11.set(landroidWaitingTriggered));
+  resend(msg11.set(landroidWaitingTriggered), radioRetries);
   wait(RADIO_PAUSE);
 
   // Send Landroid waiting timer status to gateway
@@ -565,7 +567,7 @@ void loop()
     Serial.print(")");
     Serial.print(" status: ");
 #endif
-    send(msg12.set(timeElapsed / 1000));
+    resend(msg12.set(timeElapsed / 1000), radioRetries);
     wait(RADIO_PAUSE);
   }
 
@@ -578,7 +580,7 @@ void loop()
     Serial.print(")");
     Serial.print(" status: ");
 #endif
-    send(msg12.set(0));
+    resend(msg12.set(0), radioRetries);
     wait(RADIO_PAUSE);
   }
 
@@ -627,9 +629,9 @@ void resend(MyMessage &msg, int repeats)
       sendOK = false;
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
-      repeatdelay += random(50,200);
-    } 
-    repeat++; 
+      repeatdelay += random(50, 200);
+    }
+    repeat++;
     delay(repeatdelay);
   }
 }
