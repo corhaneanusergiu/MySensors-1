@@ -81,8 +81,11 @@
 // Set RF24L01 channel number
 // #define MY_RF24_CHANNEL 125
 
-// For crappy PA+LNA module
-// #define MY_RF24_PA_LEVEL RF24_PA_LOW
+// Manually define the module PA level
+#define MY_RF24_PA_LEVEL RF24_PA_MAX
+
+// Manually define the datarate
+#define MY_RF24_DATARATE RF24_250KBPS
 
 #define MY_GATEWAY_ESP8266
 #define MY_ESP8266_SSID "Swifty"
@@ -90,6 +93,9 @@
 
 // Enable UDP communication
 // #define MY_USE_UDP
+
+// Set the hostname for the WiFi Client. This is the hostname it will pass to the DHCP server if not static.
+#define MY_ESP8266_HOSTNAME "MySensors Gateway"
 
 // Enable MY_IP_ADDRESS here if you want a static ip address (no DHCP)
 // #define MY_IP_ADDRESS 192,168,1,43
@@ -102,7 +108,7 @@
 #define MY_PORT 5003
 
 // How many clients should be able to connect to this gateway (default 1)
-#define MY_GATEWAY_MAX_CLIENTS 5
+#define MY_GATEWAY_MAX_CLIENTS 2
 
 // Controller ip address. Enables client mode (default is "server" mode).
 // Also enable this if MY_USE_UDP is used and you want sensor data sent somewhere.
@@ -122,7 +128,7 @@
 // Flash leds on rx/tx/err
 #define MY_LEDS_BLINKING_FEATURE
 // Set blinking period
-#define MY_DEFAULT_LED_BLINK_PERIOD 100
+#define MY_DEFAULT_LED_BLINK_PERIOD 300
 
 // Led pins used if blinking feature is enabled above
 #define MY_DEFAULT_ERR_LED_PIN 16 // Error led pin

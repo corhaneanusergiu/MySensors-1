@@ -13,7 +13,7 @@
 #define MY_DEBUG
 
 #define MY_NODE_ID 4
-#define MY_PARENT_NODE_ID 3 // AUTO
+#define MY_PARENT_NODE_ID 0 // AUTO
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -81,7 +81,8 @@ void loop()
 void receive(const MyMessage &message)
 {
   // We only expect one type of message from controller, but we better check anyway
-  if (message.type == V_LIGHT && message.sensor == 1)
+  if (message.type == V_LIGHT)
+    // if (message.type == V_LIGHT && message.sensor == 1)
   {
     // Change relay state
     lastState = message.getBool();

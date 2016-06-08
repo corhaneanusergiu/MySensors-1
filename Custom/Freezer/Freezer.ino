@@ -13,7 +13,7 @@
 //*** MY SENSORS ******************************************
 
 // Enable debug prints to serial monitor
-// #define MY_DEBUG
+#define MY_DEBUG
 
 #define MY_NODE_ID 2
 // #define MY_PARENT_NODE_ID 1 // AUTO

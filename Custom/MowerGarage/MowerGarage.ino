@@ -21,10 +21,10 @@
 //*** MY SENSORS ******************************************
 
 // Enable debug prints
-// #define MY_DEBUG
+#define MY_DEBUG
 
 #define MY_NODE_ID 3
-// #define MY_PARENT_NODE_ID 0 // AUTO
+#define MY_PARENT_NODE_ID AUTO // AUTO
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -33,8 +33,11 @@
 // Set RF24L01+ channel number
 // #define MY_RF24_CHANNEL 125
 
-// For crappy PA+LNA module
-// #define MY_RF24_PA_LEVEL RF24_PA_LOW
+// Manually define the module PA level
+#define MY_RF24_PA_LEVEL RF24_PA_MAX
+
+// Manually define the datarate
+#define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
@@ -50,7 +53,7 @@
 #define LOOP_PAUSE 60000
 
 // Define time between sensors blocks
-#define SENSORS_DELAY 100  // This allows sensor VCC to settle between readings, ideally 0...
+#define SENSORS_DELAY 200  // This allows sensor VCC to settle between readings, ideally 0...
 
 #define NEO_PIN 2
 #define NUM_LEDS 8
@@ -68,7 +71,7 @@ Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(NUM_LEDS, NEO_PIN, NEO_GRB + NEO_KH
 // Analog input pin moisture sensor
 #define ANALOG_INPUT_MOISTURE A0
 // Define moisture upper limit
-int moistureLimit = 800;
+int moistureLimit = 850;
 // Moisture reading derived from analog value
 int moistureValue = -1;
 // Analog smoothing
@@ -276,7 +279,7 @@ void loop()
     Serial.println(average);
 #endif
     {
-      send(msg1.set(moistureValue == 0 ? 1 : 0));
+      send(msg1.set(moistureValue == 0 ? 1 : 0)); // Send the inverse
       wait(RADIO_PAUSE);
       send(msg2.set(average));
       wait(RADIO_PAUSE);
@@ -300,7 +303,7 @@ void loop()
   {
 #ifdef MY_DEBUG
     Serial.print("Rain: ");
-    Serial.println(rainValue == 0 ? 1 : 0);
+    Serial.println(rainValue == 0 ? 1 : 0); // Print the inverse
 #endif
     send(msg3.set(rainValue == 0 ? 1 : 0)); // Send the inverse
     wait(RADIO_PAUSE);
@@ -588,11 +591,11 @@ void setHomeLights(Adafruit_NeoPixel & strip1, boolean isGreen)
   {
     if (isGreen)
     {
-      strip1.setPixelColor(i, 0, 50, 0);
+      strip1.setPixelColor(i, 0, 10, 0);
     }
     else
     {
-      strip1.setPixelColor(i, 255, 0, 0);
+      strip1.setPixelColor(i, 50, 0, 0);
     }
   }
   strip1.show();
@@ -602,11 +605,31 @@ void setWaitingLights(Adafruit_NeoPixel & strip1, int enabledLeds, int totalLeds
 {
   for (int i = 0; i < enabledLeds; ++i)
   {
-    strip1.setPixelColor(i, 0, 50, 0);
+    strip1.setPixelColor(i, 0, 10, 0);
   }
   for (int i = enabledLeds; i < totalLeds; ++i)
   {
-    strip1.setPixelColor(i, 255, 0, 0);
+    strip1.setPixelColor(i, 50, 0, 0);
   }
   strip1.show();
+}
+
+void resend(MyMessage &msg, int repeats)
+{
+  int repeat = 0;
+  int repeatdelay = 0;
+  boolean sendOK = false;
+
+  while ((sendOK == false) and (repeat < repeats)) {
+    if (send(msg)) {
+      sendOK = true;
+    } else {
+      sendOK = false;
+      Serial.print(F("Send ERROR "));
+      Serial.println(repeat);
+      repeatdelay += random(50,200);
+    } 
+    repeat++; 
+    delay(repeatdelay);
+  }
 }
