@@ -48,7 +48,7 @@
 //*** CONFIG **********************************************
 
 // Define radio wait time between sends
-#define RADIO_PAUSE 0 // This allows the radio to settle between sends, ideally 0...
+#define RADIO_PAUSE 50 // This allows the radio to settle between sends, ideally 0...
 
 // Define radio retries upon failure
 int radioRetries = 5;
@@ -235,7 +235,7 @@ void loop()
     Serial.println(moistureValue == 0 ? 1 : 0);
 #endif
     resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
-    wait(RADIO_PAUSE);
+    // wait(RADIO_PAUSE);
     lastMoistureValue = moistureValue; // For testing can be 0 or 1 or back to moistureValue
   }
 #endif
@@ -284,9 +284,9 @@ void loop()
 #endif
     {
       resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
-      wait(RADIO_PAUSE);
+      // wait(RADIO_PAUSE);
       resend(msg2.set(average), radioRetries);
-      wait(RADIO_PAUSE);
+      // wait(RADIO_PAUSE);
       lastMoistureValue = moistureValue; // For testing can be 0 or 1 or back to moistureValue
     }
   }
@@ -309,7 +309,7 @@ void loop()
     Serial.println(rainValue == 0 ? 1 : 0); // Print the inverse
 #endif
     resend(msg3.set(rainValue == 0 ? 1 : 0), radioRetries); // Send the inverse
-    wait(RADIO_PAUSE);
+    // wait(RADIO_PAUSE);
     lastRainValue = rainValue; // For testing can be 0 or 1 or back to rainValue
   }
 
@@ -328,7 +328,7 @@ void loop()
     Serial.println(lux);
 #endif
     resend(msg4.set(lux), radioRetries);
-    wait(RADIO_PAUSE);
+    // wait(RADIO_PAUSE);
     lastlux = lux;
   }
 
@@ -347,7 +347,7 @@ void loop()
     Serial.println(metric ? " cm" : " in");
 #endif
     resend(msg5.set(dist), radioRetries);
-    wait(RADIO_PAUSE);
+    // wait(RADIO_PAUSE);
     lastDist = dist;
   }
 
@@ -544,7 +544,7 @@ void loop()
   Serial.print(" status: ");
 #endif
   resend(msg10.set(landroidHome), radioRetries);
-  wait(RADIO_PAUSE);
+  // wait(RADIO_PAUSE);
 
   // Send Landroid waiting status to gateway
 #ifdef MY_DEBUG
@@ -555,7 +555,7 @@ void loop()
   Serial.print(" status: ");
 #endif
   resend(msg11.set(landroidWaitingTriggered), radioRetries);
-  wait(RADIO_PAUSE);
+  // wait(RADIO_PAUSE);
 
   // Send Landroid waiting timer status to gateway
   if ( landroidWaitingTriggered == true && timeElapsed > LOOP_PAUSE && timeElapsed < TIMER4)
@@ -568,7 +568,7 @@ void loop()
     Serial.print(" status: ");
 #endif
     resend(msg12.set(timeElapsed / 1000), radioRetries);
-    wait(RADIO_PAUSE);
+    // wait(RADIO_PAUSE);
   }
 
   else
@@ -581,7 +581,7 @@ void loop()
     Serial.print(" status: ");
 #endif
     resend(msg12.set(0), radioRetries);
-    wait(RADIO_PAUSE);
+    // wait(RADIO_PAUSE);
   }
 
   wait(LOOP_PAUSE); // Sleep or wait (repeater)
@@ -622,13 +622,19 @@ void resend(MyMessage &msg, int repeats)
   int repeatdelay = 0;
   boolean sendOK = false;
 
-  while ((sendOK == false) and (repeat < repeats)) {
-    if (send(msg)) {
+  while ((sendOK == false) and (repeat < radioRetries))
+  {
+    if (send(msg))
+    {
       sendOK = true;
-    } else {
+    }
+    else
+    {
       sendOK = false;
+#ifdef MY_DEBUG
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
+#endif
       repeatdelay += random(50, 200);
     }
     repeat++;
