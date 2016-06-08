@@ -285,7 +285,7 @@ void loop()
     {
       resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
       wait(RADIO_PAUSE);
-      send(msg2.set(average));
+      resend(msg2.set(average), radioRetries);
       wait(RADIO_PAUSE);
       lastMoistureValue = moistureValue; // For testing can be 0 or 1 or back to moistureValue
     }
