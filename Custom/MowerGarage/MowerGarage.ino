@@ -13,11 +13,11 @@
   V2.3 - Added message failure retry function
 */
 
-#include <SPI.h>
 #include <BH1750.h>
 #include <NewPing.h>
 #include <Adafruit_NeoPixel.h>
 #include <elapsedMillis.h>
+#include <SPI.h>
 
 //*** MY SENSORS ******************************************
 
@@ -25,7 +25,7 @@
 #define MY_DEBUG
 
 #define MY_NODE_ID 3
-#define MY_PARENT_NODE_ID AUTO // AUTO
+// #define MY_PARENT_NODE_ID AUTO // AUTO
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -35,15 +35,15 @@
 // #define MY_RF24_CHANNEL 125
 
 // Manually define the module PA level
-#define MY_RF24_PA_LEVEL RF24_PA_MAX
+// #define MY_RF24_PA_LEVEL RF24_PA_HIGH
 
 // Manually define the datarate
-#define MY_RF24_DATARATE RF24_250KBPS
+// #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
 
-#include <MySensor.h>
+#include <MySensors.h>
 
 //*** CONFIG **********************************************
 
@@ -51,13 +51,13 @@
 #define RADIO_PAUSE 50 // This allows the radio to settle between sends, ideally 0...
 
 // Define radio retries upon failure
-int radioRetries = 5;
+int radioRetries = 10;
 
 // Define end of loop pause time
 #define LOOP_PAUSE 60000
 
 // Define time between sensors blocks
-#define SENSORS_DELAY 200  // This allows sensor VCC to settle between readings, ideally 0...
+#define SENSORS_DELAY 100  // This allows sensor VCC to settle between readings, ideally 0...
 
 // Define NeoPixel settings
 #define NEO_PIN 2
@@ -194,7 +194,7 @@ void setup()
 void presentation()
 {
   // Send the sketch version information to the gateway and controller
-  sendSketchInfo("Mower Garage", "2.2");
+  sendSketchInfo("Mower Garage", "2.3");
   wait(RADIO_PAUSE);
   // Register all sensors to the gateway (they will be created as child devices)
   present(CHILD_ID1, S_MOTION);
@@ -249,7 +249,7 @@ void loop()
   reading[readIndex] = analogRead(ANALOG_INPUT_MOISTURE); // Read analog moisture value
   digitalWrite(MOISTURE_POWER_PIN, LOW); // Turn moisture power pin off
 #ifdef MY_DEBUG
-  Serial.print("Reading: ");
+  Serial.print("Moisture: ");
   Serial.println(reading[readIndex]);
 #endif
   total = total + reading[readIndex]; // Add the reading to the smoothing total
@@ -279,7 +279,7 @@ void loop()
 #ifdef MY_DEBUG
     Serial.print("Moisture: ");
     Serial.println(moistureValue);
-    Serial.print("Moisture: ");
+    Serial.print("Moisture Avg: ");
     Serial.println(average);
 #endif
     {

@@ -2,7 +2,7 @@
   REVISION HISTORY
   Created by Mark Swift
   V1.0 - Initial release.
-  V1.1 - Messages only for the correct sensor ID are processed
+  V1.1 - Messages only for the correct sensor ID are processed.
 */
 
 #include <SPI.h>
@@ -17,7 +17,7 @@
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
-//#define MY_RADIO_RFM69
+// #define MY_RADIO_RFM69
 
 // Set RF24L01+ channel number
 // #define MY_RF24_CHANNEL 125
@@ -28,7 +28,7 @@
 // Enable repeater functionality for this node
 // #define MY_REPEATER_FEATURE
 
-#include <MySensor.h>
+#include <MySensors.h>
 
 //*** CONFIG **********************************************
 

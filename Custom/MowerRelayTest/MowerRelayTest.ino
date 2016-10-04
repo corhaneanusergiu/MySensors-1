@@ -25,7 +25,7 @@
 // Enable repeater functionality for this node
 // #define MY_REPEATER_FEATURE
 
-#include <MySensor.h>
+#include <MySensors.h>
 
 //*********************************************************
 

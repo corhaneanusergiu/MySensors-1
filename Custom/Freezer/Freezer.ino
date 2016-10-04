@@ -1,14 +1,14 @@
 /*
   REVISION HISTORY
   Created by Mark Swift
-  V1.1 - Started code clean up
-  V1.2 - Cleaned up
-  V1.3 - Changed sleep to smartSleep to allow for future developments // Cancelled for now as doesn't work so well!
+  V1.1 - Started code clean up.
+  V1.2 - Cleaned up.
+  V1.3 - Changed sleep to smartSleep to allow for future developments // Cancelled for now as doesn't work so well!.
 */
 
-#include <SPI.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
+#include <SPI.h>
 
 //*** MY SENSORS ******************************************
 
@@ -16,7 +16,7 @@
 #define MY_DEBUG
 
 #define MY_NODE_ID 2
-// #define MY_PARENT_NODE_ID 1 // AUTO
+// #define MY_PARENT_NODE_ID AUTO // AUTO
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -31,7 +31,7 @@
 // Enabled repeater feature for this node
 // #define MY_REPEATER_FEATURE
 
-#include <MySensor.h>
+#include <MySensors.h>
 
 //*** CONFIG **********************************************
 
@@ -100,5 +100,5 @@ void loop()
     }
   }
 
-  sleep(LOOP_TIME); // Sleep or wait (repeater)
+  wait(LOOP_TIME); // Sleep or wait (repeater)
 }

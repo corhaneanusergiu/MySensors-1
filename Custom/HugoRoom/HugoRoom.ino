@@ -6,13 +6,13 @@
   V1.3 - Corrected sensor child ID bug.
 */
 
-#include <SPI.h>
 #include <DHT.h>
+#include <SPI.h>
 
 //*** MY SENSORS ******************************************
 
 // Enable debug prints
-// #define MY_DEBUG
+#define MY_DEBUG
 
 #define MY_NODE_ID 1
 // #define MY_PARENT_NODE_ID 0 // AUTO
@@ -30,7 +30,7 @@
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
 
-#include <MySensor.h>
+#include <MySensors.h>
 
 //*** CONFIG **********************************************
 
