@@ -42,7 +42,7 @@
  */
 
 // Enable debug prints to serial monitor
-#define MY_DEBUG 
+// #define MY_DEBUG 
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -90,8 +90,6 @@
 // Note that most of the Ardunio examples use  "DEAD BEEF FEED" for the MAC address.
 #define MY_MAC_ADDRESS 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED
 
-// Flash leds on rx/tx/err
-#define MY_LEDS_BLINKING_FEATURE
 // Set blinking period
 #define MY_DEFAULT_LED_BLINK_PERIOD 300
 

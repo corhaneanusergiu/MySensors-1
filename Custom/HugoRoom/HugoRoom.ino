@@ -12,10 +12,10 @@
 //*** MY SENSORS ******************************************
 
 // Enable debug prints
-#define MY_DEBUG
+// #define MY_DEBUG
 
 #define MY_NODE_ID 1
-// #define MY_PARENT_NODE_ID 0 // AUTO
+#define MY_PARENT_NODE_ID 0 // AUTO
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
