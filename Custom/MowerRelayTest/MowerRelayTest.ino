@@ -10,7 +10,9 @@
 #define MY_DEBUG
 
 #define MY_NODE_ID 99
-// #define MY_PARENT_NODE_ID 0 // AUTO
+#define MY_PARENT_NODE_ID AUTO // AUTO
+// #define MY_PARENT_NODE_IS_STATIC
+// #define MY_BAUD_RATE 9600 // For us with 1Mhz modules
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -25,11 +27,12 @@
 // Enable repeater functionality for this node
 // #define MY_REPEATER_FEATURE
 
+// Enables OTA firmware updates
+// #define MY_OTA_FIRMWARE_FEATURE
+
 #include <MySensors.h>
 
 //*********************************************************
-
-#include <SPI.h>
 
 void setup()
 {
@@ -49,5 +52,3 @@ void loop()
   Serial.println(getNodeId());
 
 }
-
-

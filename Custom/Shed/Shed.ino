@@ -9,12 +9,11 @@
 
 #include <DallasTemperature.h>
 #include <OneWire.h>
-#include <SPI.h>
 
 //*** MY SENSORS ******************************************
 
 // Enable debug prints to serial monitor
-#define MY_DEBUG
+// #define MY_DEBUG
 
 #define MY_NODE_ID 2
 #define MY_PARENT_NODE_ID AUTO // AUTO
@@ -126,7 +125,7 @@ void loop()
       Serial.print("Temperature: ");
       Serial.println(temperature);
 #endif
-      send(msg1.setSensor(i).set(temperature, 1)); // Send in the new temperature
+      resend(msg1.setSensor(i).set(temperature, 1), radioRetries); // Send in the new temperature
       wait(500); // If set to sleeping, will still have time to wait for OTA messages...
       lastTemperature[i] = temperature; // Save new temperatures for next compare
     }
@@ -163,11 +162,37 @@ void loop()
     Serial.println(average);
 #endif
     {
-      send(msg2.set(average));
+      resend(msg2.set(average), radioRetries);
       // For testing can be 0 or 1 or back to moistureValue
       lastMoistureValue = average;
     }
   }
 
   wait(LOOP_TIME); // Sleep or wait (repeater)
+}
+
+void resend(MyMessage &msg, int repeats)
+{
+  int repeat = 0;
+  int repeatdelay = 0;
+  boolean sendOK = false;
+
+  while ((sendOK == false) and (repeat < radioRetries))
+  {
+    if (send(msg))
+    {
+      sendOK = true;
+    }
+    else
+    {
+      sendOK = false;
+#ifdef MY_DEBUG
+      Serial.print(F("Send ERROR "));
+      Serial.println(repeat);
+#endif
+      repeatdelay += random(50, 200);
+    }
+    repeat++;
+    delay(repeatdelay);
+  }
 }
