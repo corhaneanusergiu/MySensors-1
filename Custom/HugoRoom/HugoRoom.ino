@@ -1,9 +1,10 @@
 /*
   REVISION HISTORY
   Created by Mark Swift
-  V1.1 - Cleaned up code.
-  V1.2 - Added PIR sensor.
-  V1.3 - Corrected sensor child ID bug.
+  V1.1 - Cleaned up code
+  V1.2 - Added PIR sensor
+  V1.3 - Corrected sensor child ID bug
+  V1.4 - Removed OTA lines (Not needed) + slight code cleanup
 */
 
 #include <DHT.h>
@@ -15,8 +16,8 @@
 
 #define MY_NODE_ID 1
 #define MY_PARENT_NODE_ID 0 // AUTO
-// #define MY_PARENT_NODE_IS_STATIC
-// #define MY_BAUD_RATE 9600 // For us with 1Mhz modules
+#define MY_PARENT_NODE_IS_STATIC
+// #define MY_BAUD_RATE 9600 // For use with 1Mhz modules
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -30,9 +31,6 @@
 
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
-
-// Enables OTA firmware updates
-// #define MY_OTA_FIRMWARE_FEATURE
 
 #include <MySensors.h>
 
@@ -81,23 +79,20 @@ void setup()
 void presentation()
 {
   // Send the Sketch Version Information to the Gateway
-  sendSketchInfo("Hugo's Room", "1.3");
+  sendSketchInfo("Hugo's Room", "1.4");
   // Register all sensors to the gateway (they will be created as child devices)
   present(CHILD_ID1, S_TEMP);
   present(CHILD_ID2, S_HUM);
   present(CHILD_ID3, S_MOTION);
 }
 
-void loop()
-{
+void loop() {
 
-  //*** DHT SENSOR ****************************************
+  //*** DHT SENSOR TEM ****************************************
 
   wait(dht.getMinimumSamplingPeriod()); // Delay or wait (repeater)
-
   // Fetch temperatures from DHT sensor
   float temperature = dht.getTemperature();
-
   if (isnan(temperature))
   {
     Serial.println("Failed reading temperature from DHT");
@@ -118,9 +113,10 @@ void loop()
 #endif
   }
 
+  //*** DHT SENSOR HUM ****************************************
+
   // Fetch humidity from DHT sensor
   float humidity = dht.getHumidity();
-
   if (isnan(humidity))
   {
 #ifdef MY_DEBUG
@@ -143,12 +139,10 @@ void loop()
 
   // Read digital motion value
   boolean tripped = digitalRead(PIR_DIGITAL_PIN) == HIGH;
-
 #ifdef MY_DEBUG
   Serial.print("PIR: ");
   Serial.println(tripped);
 #endif
   send(msg3.set(tripped ? "1" : "0")); // Send tripped value to gateway
-
   wait(LOOP_TIME); // Sleep or wait (repeater)
 }

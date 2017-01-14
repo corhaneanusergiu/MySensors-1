@@ -21,12 +21,12 @@
 //*** MY SENSORS ******************************************
 
 // Enable debug prints
-#define MY_DEBUG
+// #define MY_DEBUG
 
 #define MY_NODE_ID 3
 #define MY_PARENT_NODE_ID AUTO // AUTO
 // #define MY_PARENT_NODE_IS_STATIC
-// #define MY_BAUD_RATE 9600 // For us with 1Mhz modules
+// #define MY_BAUD_RATE 9600 // For use with 1Mhz modules
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -43,9 +43,6 @@
 
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
-
-// Enables OTA firmware updates
-// #define MY_OTA_FIRMWARE_FEATURE
 
 #include <MySensors.h>
 
@@ -144,11 +141,11 @@ elapsedMillis timeElapsed;
 boolean metric = true;
 
 // Define sensor children IDs for MySensors
-#define CHILD_ID1 1 // Moisture Value
+#define CHILD_ID1 1 // Moisture
 #ifdef MOISTURE_MODE_A
 #define CHILD_ID2 2 // Moisture Analog Reading
 #endif
-#define CHILD_ID3 3 // Rain Status
+#define CHILD_ID3 3 // Rain
 #define CHILD_ID4 4 // Light
 #define CHILD_ID5 5 // Distance
 #define CHILD_ID10 10 // Landroid home boolean
@@ -623,10 +620,10 @@ void setWaitingLights(Adafruit_NeoPixel & strip1, int enabledLeds, int totalLeds
 void resend(MyMessage &msg, int repeats)
 {
   int repeat = 0;
-  int repeatdelay = 0;
+  int repeatdelay = 200;
   boolean sendOK = false;
 
-  while ((sendOK == false) and (repeat < radioRetries))
+  while ((sendOK == false) and (repeat < repeats))
   {
     if (send(msg))
     {
@@ -639,9 +636,9 @@ void resend(MyMessage &msg, int repeats)
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
 #endif
-      repeatdelay += random(50, 200);
     }
     repeat++;
-    delay(repeatdelay);
+    wait(repeatdelay);
   }
 }
+
