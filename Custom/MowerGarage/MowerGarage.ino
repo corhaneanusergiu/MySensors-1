@@ -11,6 +11,7 @@
   V2.1 - Preventing moisture readings being set or sent until analog smoothing in place
   V2.2 - Added mower relay activate / deactivate logic
   V2.3 - Added message failure retry function
+  V2.4 - Optimised resend, also changed delay to wait
 */
 
 #include <BH1750.h>
@@ -24,8 +25,8 @@
 // #define MY_DEBUG
 
 #define MY_NODE_ID 3
-#define MY_PARENT_NODE_ID AUTO // AUTO
-// #define MY_PARENT_NODE_IS_STATIC
+#define MY_PARENT_NODE_ID 0 // AUTO
+#define MY_PARENT_NODE_IS_STATIC
 // #define MY_BAUD_RATE 9600 // For use with 1Mhz modules
 
 // Enable and select radio type attached
@@ -195,7 +196,7 @@ void setup()
 void presentation()
 {
   // Send the sketch version information to the gateway and controller
-  sendSketchInfo("Mower Garage", "2.3");
+  sendSketchInfo("Mower Garage", "2.4");
   wait(RADIO_PAUSE);
   // Register all sensors to the gateway (they will be created as child devices)
   present(CHILD_ID1, S_MOTION);
@@ -620,10 +621,10 @@ void setWaitingLights(Adafruit_NeoPixel & strip1, int enabledLeds, int totalLeds
 void resend(MyMessage &msg, int repeats)
 {
   int repeat = 0;
-  int repeatdelay = 200;
+  int repeatdelay = 0;
   boolean sendOK = false;
 
-  while ((sendOK == false) and (repeat < repeats))
+  while ((sendOK == false) and (repeat < radioRetries))
   {
     if (send(msg))
     {
@@ -636,6 +637,7 @@ void resend(MyMessage &msg, int repeats)
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
 #endif
+      repeatdelay += random(50, 200);
     }
     repeat++;
     wait(repeatdelay);
