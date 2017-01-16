@@ -77,7 +77,7 @@ void setup()
 }
 
 void presentation() {
-  // Send the sketch version information to the gateway and Controller
+  // Send the sketch version information to the gateway and controller
   sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
 
   // Register binary input sensor to sensor_node (they will be created as child devices).

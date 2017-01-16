@@ -12,6 +12,7 @@
   V2.2 - Added mower relay activate / deactivate logic
   V2.3 - Added message failure retry function
   V2.4 - Optimised resend, also changed delay to wait
+  V2.5 - Small changes to formatting and layout
 */
 
 #include <BH1750.h>
@@ -24,22 +25,24 @@
 // Enable debug prints
 // #define MY_DEBUG
 
+// Lower serial speed if using 1Mhz clock
+// #define MY_BAUD_RATE 9600
+
 #define MY_NODE_ID 3
 #define MY_PARENT_NODE_ID 0 // AUTO
 #define MY_PARENT_NODE_IS_STATIC
-// #define MY_BAUD_RATE 9600 // For use with 1Mhz modules
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
 // #define MY_RADIO_RFM69
 
-// Set RF24L01+ channel number
+// Override RF24L01 channel number
 // #define MY_RF24_CHANNEL 125
 
-// Manually define the module PA level
+// Override RF24L01 module PA level
 // #define MY_RF24_PA_LEVEL RF24_PA_HIGH
 
-// Manually define the datarate
+// Override RF24L01 datarate
 // #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
@@ -48,6 +51,10 @@
 #include <MySensors.h>
 
 //*** CONFIG **********************************************
+
+#define SKETCH_NAME "Mower Garage"
+#define SKETCH_MAJOR_VER "2"
+#define SKETCH_MINOR_VER "5"
 
 // Define radio wait time between sends
 #define RADIO_PAUSE 50 // This allows the radio to settle between sends, ideally 0...
@@ -196,7 +203,7 @@ void setup()
 void presentation()
 {
   // Send the sketch version information to the gateway and controller
-  sendSketchInfo("Mower Garage", "2.4");
+  sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
   wait(RADIO_PAUSE);
   // Register all sensors to the gateway (they will be created as child devices)
   present(CHILD_ID1, S_MOTION);
