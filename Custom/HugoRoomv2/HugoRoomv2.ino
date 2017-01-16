@@ -5,13 +5,13 @@
   V1.2 - Added PIR sensor
   V1.3 - Corrected sensor child ID bug
   V1.4 - Removed OTA lines (Not needed) + slight code cleanup
-  V1.5 - Refactor code, introduce timer logic
+  V1.5 - Refactor code and introduce timer logic
 */
 
 #include <DHT.h>
 #include <elapsedMillis.h>
 
-//*** MY SENSORS ******************************************
+//*** MYSENSORS *******************************************
 
 // Enable debug prints
 #define MY_DEBUG
@@ -41,7 +41,9 @@
 
 #include <MySensors.h>
 
-#define SKETCH_NAME "Hugo's Bedroom"
+// *** SKETCH CONFIG **************************************
+
+#define SKETCH_NAME "Hugo Bedroom"
 #define SKETCH_MAJOR_VER "1"
 #define SKETCH_MINOR_VER "5"
 
@@ -60,18 +62,23 @@ boolean metric = true;
 
 // *** SENSORS CONFIG *************************************
 
-// PIR sensor
-#define PIR_DIGITAL_PIN 2 // The digital input of the motion sensor
-boolean last_motion =  0;
+// Define end of loop pause time
+#define LOOP_PAUSE 5000
 
-// Declare timers as globals so they will not reset each loop
-elapsedMillis time_elapsed_temperature; // Temperature
-elapsedMillis time_elapsed_humidity; // Humidity
-// Force send an update of the temperature and humidity after x
+// Define timers as global so they will not reset each loop
+elapsedMillis time_elapsed_temperature;
+elapsedMillis time_elapsed_humidity;
+
+// Force send updates of temperature and humidity after x milliseconds
 #define TIMER_TEMPERATURE 600000
 #define TIMER_HUMIDITY 600000
 
-// Define DHT22 pin
+// PIR sensor pin
+#define PIR_DIGITAL_PIN 2
+// Store last motion status for comparison
+boolean last_motion =  0;
+
+// DHT sensor pin
 #define DHT_DIGITAL_PIN 3
 // Set DHT process name
 DHT dht;
@@ -171,4 +178,5 @@ void loop() {
     last_motion = motion;
     send(msg3.set(motion ? "1" : "0")); // Send PIR value value to gateway
   }
+  wait(LOOP_PAUSE);
 }
