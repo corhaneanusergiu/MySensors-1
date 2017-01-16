@@ -29,8 +29,8 @@
 // #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 3
-#define MY_PARENT_NODE_ID 0 // AUTO
-#define MY_PARENT_NODE_IS_STATIC
+#define MY_PARENT_NODE_ID AUTO // AUTO
+// #define MY_PARENT_NODE_IS_STATIC
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -625,26 +625,22 @@ void setWaitingLights(Adafruit_NeoPixel & strip1, int enabledLeds, int totalLeds
   strip1.show();
 }
 
-void resend(MyMessage &msg, int repeats)
-{
+void resend(MyMessage &msg, int repeats) {
   int repeat = 0;
   int repeatdelay = 0;
   boolean sendOK = false;
 
-  while ((sendOK == false) and (repeat < radioRetries))
-  {
-    if (send(msg))
-    {
+  while ((sendOK == false) and (repeat < radioRetries)) {
+    if (send(msg)) {
       sendOK = true;
     }
-    else
-    {
+    else {
       sendOK = false;
+      repeatdelay += random(50, 200);
 #ifdef MY_DEBUG
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
 #endif
-      repeatdelay += random(50, 200);
     }
     repeat++;
     wait(repeatdelay);

@@ -5,23 +5,23 @@
   V1.2 - Added PIR sensor
   V1.3 - Corrected sensor child ID bug
   V1.4 - Removed OTA lines (Not needed) + slight code cleanup
-  V1.5 - Refactor code, introduce timer logic
+  V1.5 - Refactor code and introduce timer logic
 */
 
 #include <DHT.h>
 #include <elapsedMillis.h>
 
-//*** MY SENSORS ******************************************
+//*** MYSENSORS *******************************************
 
 // Enable debug prints
-#define MY_DEBUG
+// #define MY_DEBUG
 
 // Lower serial speed if using 1Mhz clock
 // #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 1
-#define MY_PARENT_NODE_ID 0 // AUTO
-#define MY_PARENT_NODE_IS_STATIC
+#define MY_PARENT_NODE_ID AUTO // AUTO
+// #define MY_PARENT_NODE_IS_STATIC
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -41,44 +41,47 @@
 
 #include <MySensors.h>
 
-#define SKETCH_NAME "Hugo's Bedroom"
+// *** SKETCH CONFIG **************************************
+
+#define SKETCH_NAME "Hugo Bedroom"
 #define SKETCH_MAJOR_VER "1"
 #define SKETCH_MINOR_VER "5"
 
 // Define the sensor child IDs
 #define CHILD_ID1 1 // Temperature
 #define CHILD_ID2 2 // Humidity
-#define CHILD_ID3 3 // PIR
+#define CHILD_ID3 3 // Motion
 
 // Define the message formats
 MyMessage msg1(CHILD_ID1, V_TEMP);
 MyMessage msg2(CHILD_ID2, V_HUM);
 MyMessage msg3(CHILD_ID3, V_TRIPPED);
 
-// Set default setting for reading formats
-boolean metric = true;
-
 // *** SENSORS CONFIG *************************************
 
-// PIR sensor
-#define PIR_DIGITAL_PIN 2 // The digital input of the motion sensor
+// Motion sensor pin
+#define PIR_DIGITAL_PIN 2
+// Store last motion status for comparison
 boolean last_motion =  0;
 
-// Declare timers as globals so they will not reset each loop
-elapsedMillis time_elapsed_temperature; // Temperature
-elapsedMillis time_elapsed_humidity; // Humidity
-// Force send an update of the temperature and humidity after x
-#define TIMER_TEMPERATURE 600000
-#define TIMER_HUMIDITY 600000
-
-// Define DHT22 pin
+// DHT sensor pin
 #define DHT_DIGITAL_PIN 3
 // Set DHT process name
 DHT dht;
+
+// Define timers as global so they will not reset each loop
+elapsedMillis time_elapsed_temperature;
+elapsedMillis time_elapsed_humidity;
+
+// Force send updates of temperature and humidity after x milliseconds
+#define TIMER_TEMPERATURE 600000
+#define TIMER_HUMIDITY 600000
+
 // Change to trigger reading update
 #define THRESHOLD_TEMPERATURE 2
 // Change to trigger reading update
 #define THRESHOLD_HUMIDITY 10
+
 // Store last temperature for comparison
 float last_temperature;
 // Store last humidity for comparison
@@ -87,7 +90,6 @@ float last_humidity;
 // *** BEGIN **********************************************
 
 void setup() {
-  metric = getConfig().isMetric; // Check if gateway is metric
   dht.setup(DHT_DIGITAL_PIN); // Set DHT pin
   pinMode(PIR_DIGITAL_PIN, INPUT); // Set PIR pin to input
 }
@@ -107,15 +109,15 @@ void loop() {
 
   wait(dht.getMinimumSamplingPeriod());
   float temperature = dht.getTemperature(); // Fetch temperature from DHT sensor
-  float temperatureDifference = temperature - last_temperature; // The absolute difference
-  temperatureDifference = abs(temperatureDifference); // 'abs' is the absolute value, the result is always positive
+  float temperature_difference = temperature - last_temperature; // The absolute difference
+  temperature_difference = abs(temperature_difference); // 'abs' is the absolute value, the result is always positive
 #ifdef MY_DEBUG
   Serial.print("Temperature: ");
   Serial.println(temperature);
 #endif
 #ifdef MY_DEBUG
   Serial.print("Temperature difference: ");
-  Serial.println(temperatureDifference);
+  Serial.println(temperature_difference);
 #endif
 #ifdef MY_DEBUG
   Serial.print("Temperature timer: ");
@@ -124,27 +126,24 @@ void loop() {
   if (isnan(temperature)) {
     Serial.println("Failed to read temperature");
   }
-  else if (temperatureDifference > THRESHOLD_TEMPERATURE || time_elapsed_temperature > TIMER_TEMPERATURE) {
+  else if (temperature_difference > THRESHOLD_TEMPERATURE || time_elapsed_temperature > TIMER_TEMPERATURE) {
     last_temperature = temperature;
     time_elapsed_temperature = 0;
-    if (!metric) {
-      temperature = dht.toFahrenheit(temperature);
-    }
     send(msg1.set(temperature, 1));
   }
 
   // *** DHT SENSOR ****************************************
 
   float humidity = dht.getHumidity(); // Fetch humidity from DHT sensor
-  float humidityDifference = humidity - last_humidity; // The absolute difference
-  humidityDifference = abs(humidityDifference); // 'abs' is the absolute value, the result is always positive
+  float humidity_Difference = humidity - last_humidity; // The absolute difference
+  humidity_Difference = abs(humidity_Difference); // 'abs' is the absolute value, the result is always positive
 #ifdef MY_DEBUG
   Serial.print("Humidity: ");
   Serial.println(humidity);
 #endif
 #ifdef MY_DEBUG
   Serial.print("Humidity difference: ");
-  Serial.println(humidityDifference);
+  Serial.println(humidity_Difference);
 #endif
 #ifdef MY_DEBUG
   Serial.print("Humidity timer : ");
@@ -153,7 +152,7 @@ void loop() {
   if (isnan(temperature)) {
     Serial.println("Failed to read humidity");
   }
-  else if (humidityDifference > THRESHOLD_HUMIDITY || time_elapsed_humidity > TIMER_HUMIDITY) {
+  else if (humidity_Difference > THRESHOLD_HUMIDITY || time_elapsed_humidity > TIMER_HUMIDITY) {
     last_humidity = humidity;
     time_elapsed_humidity = 0;
     send(msg2.set(humidity, 1));
@@ -165,10 +164,10 @@ void loop() {
   boolean motion = digitalRead(PIR_DIGITAL_PIN) == HIGH;
   if (last_motion != motion) {
 #ifdef MY_DEBUG
-    Serial.print("PIR: ");
+    Serial.print("Motion: ");
     Serial.println(motion);
 #endif
     last_motion = motion;
-    send(msg3.set(motion ? "1" : "0")); // Send PIR value value to gateway
+    send(msg3.set(motion ? "1" : "0")); // Send motion value value to gateway
   }
 }

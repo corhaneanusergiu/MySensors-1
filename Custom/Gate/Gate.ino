@@ -14,12 +14,12 @@
 // Enable debug prints to serial monitor
 // #define MY_DEBUG
 
+// For use with 1Mhz modules
+// #define MY_BAUD_RATE 9600
+
 #define MY_NODE_ID 4
 #define MY_PARENT_NODE_ID 1 // AUTO
 #define MY_PARENT_NODE_IS_STATIC
-
-// For use with 1Mhz modules
-// #define MY_BAUD_RATE 9600
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24

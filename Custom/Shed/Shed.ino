@@ -1,195 +1,237 @@
 /*
   REVISION HISTORY
   Created by Mark Swift
-  V1.1 - Started code clean up.
-  V1.2 - Cleaned up.
+  V1.1 - Started code clean up
+  V1.2 - Cleaned up
   V1.3 - Changed sleep to smartSleep to allow for future developments // Cancelled for now as doesn't work so well!
-  V2.0 - Integrated moisture sensor and optimised code.
+  V2.0 - Integrated moisture sensor and optimised code
+  V2.1 - Minor formatting changes
+  V3.0 - Refactor and added timer logic
 */
 
 #include <DallasTemperature.h>
 #include <OneWire.h>
+#include <elapsedMillis.h>
 
 //*** MY SENSORS ******************************************
 
-// Enable debug prints to serial monitor
-// #define MY_DEBUG
+// Enable debug prints
+#define MY_DEBUG
+
+// Lower serial speed if using 1Mhz clock
+// #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 2
-// #define MY_PARENT_NODE_ID 0 // AUTO
+#define MY_PARENT_NODE_ID AUTO // AUTO
 // #define MY_PARENT_NODE_IS_STATIC
-// #define MY_BAUD_RATE 9600 // For us with 1Mhz modules
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
 // #define MY_RADIO_RFM69
 
-// Channel furthest away from Wifi
+// Override RF24L01 channel number
 // #define MY_RF24_CHANNEL 125
 
-// For crappy PA+LNA module
+// Override RF24L01 module PA level
 // #define MY_RF24_PA_LEVEL RF24_PA_LOW
+
+// Override RF24L01 datarate
+// #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
 // #define MY_REPEATER_FEATURE
 
 #include <MySensors.h>
 
-//*** CONFIG **********************************************
+// *** SKETCH CONFIG **************************************
 
-// Define radio retries upon failure
-int radioRetries = 10;
+#define SKETCH_NAME "Shed"
+#define SKETCH_MAJOR_VER "3"
+#define SKETCH_MINOR_VER "0"
 
-// DS18B20 sensor settings
-#define COMPARE_TEMP 0 // Send temperature only if changed? 1 = Yes 0 = No
-#define ONE_WIRE_BUS 3 // Pin where dallas sensor is connected
-#define MAX_ATTACHED_DS18B20 16 // The maximum amount of dallas temperatures connected
-OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
-DallasTemperature sensors(&oneWire); // Pass the oneWire reference to Dallas Temperature
-float lastTemperature[MAX_ATTACHED_DS18B20];
-int numSensors = 1;
+// Define the sensor child IDs
+#define CHILD_ID1 1 // Temperature
+#define CHILD_ID2 2 // Moisture
 
-// Analog moisture settings
-#define ANALOG_INPUT_MOISTURE A0 // Analog input pin moisture sensor
-#define MOISTURE_POWER_PIN 8 // Moisture sensor power pin
-#define COMPARE_MOISTURE 0 // Send only if changed? 1 = Yes 0 = No
-int lastMoistureValue = -1; // Store last moisture reading for comparison
-const int numReadings = 10; // Anolog smoothing, the number of samples to keep track of
-int reading[numReadings]; // The readings from the analog input
-int readIndex = 0; // The index of the current reading
-int total = 0; // The running total reading
-int average = 0; // The average reading
-boolean readingsReady = false; // Only start sending readings once smoothing is complete
-
-// Define loop time
-#define LOOP_TIME 60000 // Sleep time between reads (in milliseconds)
-
-// Define sensor children
-#define CHILD_ID1 1 // Dallas temperature sensor
-#define CHILD_ID2 2 // Moisture Analog Reading
-
-// Initialise messages
+// Define the message formats
 MyMessage msg1(CHILD_ID1, V_TEMP);
 MyMessage msg2(CHILD_ID2, V_LEVEL);
 
+// *** SENSORS CONFIG *************************************
+
+// Pin where dallas sensor is connected
+#define ONE_WIRE_BUS 3
+// The maximum amount of dallas temperatures connected
+#define MAX_ATTACHED_DS18B20 16
+// Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
+OneWire oneWire(ONE_WIRE_BUS);
+// Pass the oneWire reference to Dallas Temperature
+DallasTemperature sensors(&oneWire);
+// Set default sensors attached
+int num_sensors = 1;
+
+// Analog input pin moisture sensor
+#define ANALOG_INPUT_MOISTURE A0
+// Moisture sensor power pin
+#define MOISTURE_POWER_PIN 8
+// Store last moisture reading for comparison
+int last_moisture_value = -1;
+// Anolog smoothing, the number of samples to keep track of
+const int num_readings = 10;
+// The readings from the analog input
+int reading[num_readings];
+// The index of the current reading
+int read_index = 0;
+// The running total reading
+int total = 0;
+// The average reading
+int average = 0;
+// Only start sending readings once smoothing is complete
+boolean readings_ready = false;
+
+// Define timers as global so they will not reset each loop
+elapsedMillis time_elapsed_temperature;
+elapsedMillis time_elapsed_moisture;
+
+// Force send updates of temperature and humidity after x milliseconds
+#define TIMER_TEMPERATURE 600000
+#define TIMER_MOISTURE 600000
+
+// Change to trigger reading update
+#define THRESHOLD_TEMPERATURE 2
+// Change to trigger reading update
+#define THRESHOLD_MOISTURE 10
+
+// Store last temperature for comparison
+float last_temperature[MAX_ATTACHED_DS18B20];
+// Store last humidity for comparison
+float last_moisture;
+
+// Define radio retries upon failure
+int radio_retries = 10;
+
 //*********************************************************
 
-void before()
-{
+void before() {
   // Startup up the OneWire library
   sensors.begin();
 }
 
-void setup()
-{
-  sensors.setWaitForConversion(false); // RequestTemperatures() will not block current thread
+void setup() {
+  // RequestTemperatures() will not block current thread
+  sensors.setWaitForConversion(false);
   // Set the moisture sensor power pin as output
   pinMode(MOISTURE_POWER_PIN, OUTPUT);
   // Set to LOW so no power is flowing through the moisture sensor
   digitalWrite(MOISTURE_POWER_PIN, LOW);
 }
 
-void presentation()
-{
-  sendSketchInfo("Shed", "2.0"); // Send the sketch version information to the gateway and Controller
-  numSensors = sensors.getDeviceCount(); // Fetch the number of attached temperature sensors
-  for (int i = 0; i < numSensors && i < MAX_ATTACHED_DS18B20; i++) // Present all sensors to controller
-  {
+void presentation() {
+  // Send the sketch version information to the gateway and controller
+  sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
+  // Fetch the number of attached temperature sensors
+  num_sensors = sensors.getDeviceCount();
+  // Present all sensors to controller
+  for (int i = 0; i < num_sensors && i < MAX_ATTACHED_DS18B20; i++) {
     present(i, S_TEMP);
     present(CHILD_ID2, S_MOISTURE);
   }
 }
 
-void loop()
-{
+void loop() {
 
-  //*** DS18B20 *******************************************
+  //*** TEMP SENSOR ***************************************
 
-  sensors.requestTemperatures(); // Fetch temperatures from Dallas sensors
-  int16_t conversionTime = sensors.millisToWaitForConversion(sensors.getResolution()); // Query conversion time and sleep until conversion completed
-  wait(conversionTime); // Sleep() call can be replaced by wait() call if node need to process incoming messages (or if node is repeater)
-  for (int i = 0; i < numSensors && i < MAX_ATTACHED_DS18B20; i++) // Read temperatures and send them to controller
-  {
-    float temperature = static_cast<float>(static_cast<int>((getConfig().isMetric ? sensors.getTempCByIndex(i) : sensors.getTempFByIndex(i)) * 10.)) / 10.; // Fetch and round temperature to one decimal
-#if COMPARE_TEMP == 1 // Only send data if temperature has changed and no error
-    if (lastTemperature[i] != temperature && temperature != -127.00 && temperature != 85.00)
-    {
-#else
-    if (temperature != -127.00 && temperature != 85.00)
-    {
+  // Fetch temperatures from Dallas sensors
+  sensors.requestTemperatures();
+  // Query conversion time and sleep until conversion completed
+  int16_t conversion_time = sensors.millisToWaitForConversion(sensors.getResolution());
+  // Sleep can be replaced by wait if node needs to process incoming messages or if node is repeater
+  wait(conversion_time);
+  // Read temperatures and send them to gateway and controller
+  for (int i = 0; i < num_sensors && i < MAX_ATTACHED_DS18B20; i++) {
+    // Fetch and round temperature to one decimal
+    float temperature = static_cast<float>(static_cast<int>((getConfig().isMetric ? sensors.getTempCByIndex(i) : sensors.getTempFByIndex(i)) * 10.)) / 10.;
+    float temperature_difference = temperature - last_temperature[i]; // The absolute difference
+    temperature_difference = abs(temperature_difference); // 'abs' is the absolute value, the result is always positive
+#ifdef MY_DEBUG
+    Serial.print("Temperature: ");
+    Serial.println(temperature);
 #endif
 #ifdef MY_DEBUG
-      Serial.print("Temperature: ");
-      Serial.println(temperature);
+    Serial.print("Temperature difference: ");
+    Serial.println(temperature_difference);
 #endif
-      resend(msg1.setSensor(i).set(temperature, 1), radioRetries); // Send in the new temperature
-      wait(500); // If set to sleeping, will still have time to wait for OTA messages...
-      lastTemperature[i] = temperature; // Save new temperatures for next compare
+#ifdef MY_DEBUG
+    Serial.print("Temperature timer : ");
+    Serial.println(time_elapsed_temperature / 1000);
+#endif
+    if (temperature_difference > THRESHOLD_TEMPERATURE && temperature != -127.00 && temperature != 85.00 || time_elapsed_temperature > TIMER_TEMPERATURE) {
+      last_temperature[i] = temperature;
+      time_elapsed_temperature = 0;
+      resend(msg1.setSensor(i).set(temperature, 1), radio_retries);
     }
   }
 
-  //*** MOISTURE SENSOR ANALOG ******************************
+  //*** MOISTURE SENSOR ***********************************
 
-  total = total - reading[readIndex]; // Subtract the last smoothing reading
-  digitalWrite(MOISTURE_POWER_PIN, HIGH); // Turn moisture power pin on
-  wait(200); // Set a delay to ensure the moisture sensor has powered up
-  reading[readIndex] = analogRead(ANALOG_INPUT_MOISTURE); // Read analog moisture value
-  digitalWrite(MOISTURE_POWER_PIN, LOW); // Turn moisture power pin off
+  // Subtract the last smoothing reading
+  total = total - reading[read_index];
+  // Turn moisture power pin on
+  digitalWrite(MOISTURE_POWER_PIN, HIGH);
+  // Set a delay to ensure the moisture sensor has settled
+  wait(200);
+  // Read analog moisture value
+  reading[read_index] = analogRead(ANALOG_INPUT_MOISTURE);
+  // Turn moisture power pin off to prevent oxidation
+  digitalWrite(MOISTURE_POWER_PIN, LOW);
 #ifdef MY_DEBUG
   Serial.print("Moisture Now: ");
-  Serial.println(reading[readIndex]);
+  Serial.println(reading[read_index]);
 #endif
-  total = total + reading[readIndex]; // Add the reading to the smoothing total
-  readIndex = readIndex + 1; // Advance to the next position in the smoothing array
-  if (readIndex >= numReadings) // If we're at the end of the array...
-  {
-    readingsReady = true;
-    readIndex = 0; // Wrap around to the beginning
+  // Add the reading to the smoothing total
+  total = total + reading[read_index];
+  // Advance to the next position in the smoothing array
+  read_index = read_index + 1;
+  // If we're at the end of the array...
+  if (read_index >= num_readings) {
+    readings_ready = true;
+    // Wrap around to the beginning
+    read_index = 0;
   }
-  if (readingsReady)
-  {
-    average = total / numReadings;
+  if (readings_ready) {
+    average = total / num_readings;
   }
-#if COMPARE_MOISTURE == 1
-  if (average != lastMoistureValue)
-#endif
-  {
+  float moisture_difference = average - last_moisture_value; // The absolute difference
+  moisture_difference = abs(moisture_difference); // 'abs' is the absolute value, the result is always positive
 #ifdef MY_DEBUG
-    Serial.print("Moisture Avg: ");
-    Serial.println(average);
+  Serial.print("Moisture Avg: ");
+  Serial.println(average);
 #endif
-    {
-      resend(msg2.set(average), radioRetries);
-      // For testing can be 0 or 1 or back to moistureValue
-      lastMoistureValue = average;
-    }
+  if (moisture_difference > THRESHOLD_MOISTURE || time_elapsed_moisture > TIMER_MOISTURE) {
+    last_moisture_value = average;
+    time_elapsed_moisture = 0;
+    resend(msg2.set(average), radio_retries);
   }
-
-  wait(LOOP_TIME); // Sleep or wait (repeater)
 }
 
-void resend(MyMessage &msg, int repeats)
-{
+void resend(MyMessage &msg, int repeats) {
   int repeat = 0;
   int repeatdelay = 0;
   boolean sendOK = false;
-
-  while ((sendOK == false) and (repeat < radioRetries))
-  {
-    if (send(msg))
-    {
+  while ((sendOK == false) and (repeat < radio_retries)) {
+    if (send(msg)) {
       sendOK = true;
     }
-    else
-    {
+    else {
       sendOK = false;
+      repeatdelay += random(50, 200);
 #ifdef MY_DEBUG
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
 #endif
-      repeatdelay += random(50, 200);
     }
     repeat++;
-    delay(repeatdelay);
+    wait(repeatdelay);
   }
 }
