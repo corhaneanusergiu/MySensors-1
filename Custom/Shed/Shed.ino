@@ -9,6 +9,8 @@
   V3.0 - Refactor and added timer logic
 */
 
+//*** EXTERNAL LIBRARIES **********************************
+
 #include <DallasTemperature.h>
 #include <OneWire.h>
 #include <elapsedMillis.h>

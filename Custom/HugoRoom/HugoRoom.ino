@@ -8,6 +8,8 @@
   V1.5 - Refactor code and introduce timer logic
 */
 
+//*** EXTERNAL LIBRARIES **********************************
+
 #include <DHT.h>
 #include <elapsedMillis.h>
 

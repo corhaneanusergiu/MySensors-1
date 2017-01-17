@@ -3,24 +3,26 @@
   Created by Mark Swift
   V1.4 - Reversed waiting LED logic
   V1.5 - Added analog moisture option
-  V1.6 - Added analog moisture reading gateway message
+  V1.6 - Added analog moisture current_smoothing_reading gateway message
   V1.7 - Added analog smoothing
   V1.8 - Shortened Sketch Narme (Prevent send presentation errors)
   V1.9 - Moved LED to a seperate function
   V2.0 - Corrected presentation function
-  V2.1 - Preventing moisture readings being set or sent until analog smoothing in place
+  V2.1 - Preventing moisture current_smoothing_readings being set or sent until analog smoothing in place
   V2.2 - Added mower relay activate / deactivate logic
   V2.3 - Added message failure retry function
   V2.4 - Optimised resend, also changed delay to wait
   V2.5 - Small changes to formatting and layout
 */
 
+//*** EXTERNAL LIBRARIES **********************************
+
 #include <BH1750.h>
 #include <NewPing.h>
 #include <Adafruit_NeoPixel.h>
 #include <elapsedMillis.h>
 
-//*** MY SENSORS ******************************************
+//*** MYSENSORS *******************************************
 
 // Enable debug prints
 // #define MY_DEBUG
@@ -50,28 +52,30 @@
 
 #include <MySensors.h>
 
-//*** CONFIG **********************************************
+// *** SKETCH CONFIG **************************************
 
-#define SKETCH_NAME "Mower Garage"
+#define SKETCH_NAME "Landroid Garage"
 #define SKETCH_MAJOR_VER "2"
 #define SKETCH_MINOR_VER "5"
 
-// Define radio wait time between sends
-#define RADIO_PAUSE 50 // This allows the radio to settle between sends, ideally 0...
+// *** SENSORS CONFIG *************************************
 
-// Define radio retries upon failure
-int radioRetries = 10;
+// Radio wait between sends allows the radio to settle, ideally 0...
+#define RADIO_PAUSE 50
 
-// Define end of loop pause time
+// Radio retries upon failure
+int radio_retries = 10;
+
+// End of loop pause time
 #define LOOP_PAUSE 60000
 
-// Define time between sensors blocks
-#define SENSORS_DELAY 100  // This allows sensor VCC to settle between readings, ideally 0...
+// Time between sensor blocks, allows sensor VCC to settle, ideally 0...
+#define SENSOR_DELAY 100
 
-// Define NeoPixel settings
+// NeoPixel settings
 #define NEO_PIN 2
 #define NUM_LEDS 8
-Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(NUM_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip_1 = Adafruit_NeoPixel(NUM_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
 // Set moisture mode to either digital (D) or analog (A)
 #define MOISTURE_MODE_A
@@ -84,25 +88,30 @@ Adafruit_NeoPixel strip1 = Adafruit_NeoPixel(NUM_LEDS, NEO_PIN, NEO_GRB + NEO_KH
 #ifdef MOISTURE_MODE_A
 // Analog input pin moisture sensor
 #define ANALOG_INPUT_MOISTURE A0
-// Define moisture upper limit
-int moistureLimit = 850;
-// Moisture reading derived from analog value
-int moistureValue = -1;
-// Analog smoothing
-const int numReadings = 10; // The number of samples to keep track of
-int reading[numReadings]; // The readings from the analog input
-int readIndex = 0; // The index of the current reading
-int total = 0; // The running total reading
-int average = 0; // The average reading
-boolean readingsReady = false; // Only start sending readings once smoothing is complete
+// Moisture upper limit
+int moisture_limit = 850;
+// Moisture current_smoothing_reading derived from analog value
+int moisture_value = -1;
+// Analog smoothing samples
+const int smoothing_readings = 10;
+// Analog smoothing array setup
+int current_smoothing_reading[smoothing_readings];
+// Index of current smoothing reading
+int smoothing_read_index = 0;
+// Smoothing running total
+int smoothing_total = 0;
+// Soothing average
+int smoothing_average = 0;
+// Smoothing readings ready
+boolean smoothing_readings_ready = false;
 #endif
 
 // Power pin moisture sensor
 #define MOISTURE_POWER_PIN 5
 // Send only if changed? 1 = Yes 0 = No
 #define COMPARE_MOISTURE 0
-// Store last moisture reading for comparison
-int lastMoistureValue = -1;
+// Store last moisture current_smoothing_reading for comparison
+int last_moisture_value = -1;
 
 // Power pin rain sensor
 #define RAIN_POWER_PIN 7
@@ -110,34 +119,34 @@ int lastMoistureValue = -1;
 #define DIGITAL_INPUT_RAIN 8
 // Send only if changed? 1 = Yes 0 = No
 #define COMPARE_RAIN 0
-// Store last rain reading for comparison
-int lastRainValue = -1;
+// Store last rain current_smoothing_reading for comparison
+int last_rain_value = -1;
 
 // Ultrasonic trigger pin
 #define TRIGGER_PIN 4
 // Ultrasonic echo pin
 #define ECHO_PIN 3
-// Maximum distance we want to ping for (in cms), maximum sensor distance is rated at 400-500cm
+// Maximum distance to ping in cms (maximum sensor distance is rated at 400-500cm)
 #define MAX_DISTANCE 300
 // NewPing setup of pins and maximum distance
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 // Send only if changed? 1 = Yes 0 = No
 #define COMPARE_DIST 0
-// Store last distance reading for comparison
-int lastDist = -1;
+// Store last distance current_smoothing_reading for comparison
+int last_distance_value = -1;
 
 // Set BH1750 name
-BH1750 lightSensor;
+BH1750 light_sensor;
 // Send only if changed? 1 = Yes 0 = No
 #define COMPARE_LUX 0
-// Store last LUX reading for comparison
-uint16_t lastlux = -1;
+// Store last LUX current_smoothing_reading for comparison
+uint16_t last_lux_value = -1;
 
 // Landroid settings
-boolean landroidWaiting = false;
-boolean landroidWaitingTriggered = false;
-boolean landroidHome = false;
-elapsedMillis timeElapsed;
+boolean landroid_waiting = false;
+boolean landroid_waiting_triggered = false;
+boolean landroid_home = false;
+elapsedMillis time_elapsed;
 
 // Landroid timers
 #define TIMER1 3200000 // 60 minutes * 60 seconds * 1000 millis = 3200000
@@ -148,19 +157,27 @@ elapsedMillis timeElapsed;
 // Set default gateway value for metric or imperial
 boolean metric = true;
 
-// Define sensor children IDs for MySensors
-#define CHILD_ID1 1 // Moisture
+// Define the sensor child IDs
+// Moisture boolean
+#define CHILD_ID1 1
 #ifdef MOISTURE_MODE_A
-#define CHILD_ID2 2 // Moisture Analog Reading
+// Moisture analog current_smoothing_reading
+#define CHILD_ID2 2
 #endif
-#define CHILD_ID3 3 // Rain
-#define CHILD_ID4 4 // Light
-#define CHILD_ID5 5 // Distance
-#define CHILD_ID10 10 // Landroid home boolean
-#define CHILD_ID11 11 // Landroid waiting boolean
-#define CHILD_ID12 12 // Landroid time elapsed
+// Rain boolean
+#define CHILD_ID3 3
+// Light LUX
+#define CHILD_ID4 4
+// Distance
+#define CHILD_ID5 5
+// Landroid home boolean
+#define CHILD_ID10 10
+// Landroid waiting boolean
+#define CHILD_ID11 11
+// Landroid timer
+#define CHILD_ID12 12
 
-// Define MySensors message types
+// Define the message formats
 MyMessage msg1(CHILD_ID1, V_TRIPPED);
 #ifdef MOISTURE_MODE_A
 MyMessage msg2(CHILD_ID2, V_CUSTOM);
@@ -193,11 +210,11 @@ void setup()
   // Check gateway for metric setting
   boolean metric = getConfig().isMetric;
   // Start BH1750 light sensor
-  lightSensor.begin();
+  light_sensor.begin();
   // Start NeoPixel LED strip
-  strip1.begin();
+  strip_1.begin();
   // Initialise all Neopixel LEDs off
-  strip1.show();
+  strip_1.show();
 }
 
 void presentation()
@@ -205,7 +222,7 @@ void presentation()
   // Send the sketch version information to the gateway and controller
   sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
   wait(RADIO_PAUSE);
-  // Register all sensors to the gateway (they will be created as child devices)
+  // Present all sensors to controller
   present(CHILD_ID1, S_MOTION);
   wait(RADIO_PAUSE);
 #ifdef MOISTURE_MODE_A
@@ -231,314 +248,332 @@ void loop()
   //*** MOISTURE SENSOR DIGITAL *****************************
 
 #ifdef MOISTURE_MODE_D
-  digitalWrite(MOISTURE_POWER_PIN, HIGH); // Turn moisture power pin on
-  wait(200); // Set a delay to ensure the moisture sensor has powered up
-  int moistureValue = digitalRead(DIGITAL_INPUT_MOISTURE); // Read digital moisture value
-  digitalWrite(MOISTURE_POWER_PIN, LOW); // Turn moisture power pin off
+  // Turn moisture power pin on
+  digitalWrite(MOISTURE_POWER_PIN, HIGH);
+  // Set a delay to ensure the moisture sensor has settled
+  wait(200);
+  // Read digital moisture value
+  int moisture_value = digitalRead(DIGITAL_INPUT_MOISTURE);
+  // Turn moisture power pin off to prevent oxidation
+  digitalWrite(MOISTURE_POWER_PIN, LOW);
 #if COMPARE_MOISTURE == 1
-  if (moistureValue != lastMoistureValue)
+  if (moisture_value != last_moisture_value)
 #endif
   {
 #ifdef MY_DEBUG
     Serial.print("Moisture: ");
-    Serial.println(moistureValue == 0 ? 1 : 0);
+    // Print the inverse
+    Serial.println(moisture_value == 0 ? 1 : 0);
 #endif
-    resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
-    // wait(RADIO_PAUSE);
-    lastMoistureValue = moistureValue; // For testing can be 0 or 1 or back to moistureValue
+    // Send the inverse
+    resend(msg1.set(moisture_value == 0 ? 1 : 0), radio_retries);
+    wait(RADIO_PAUSE);
+    // For testing can be 0 or 1 or back to moisture_value
+    last_moisture_value = moisture_value;
   }
 #endif
 
   //*** MOISTURE SENSOR ANALOG ******************************
 
 #ifdef MOISTURE_MODE_A
-  total = total - reading[readIndex]; // Subtract the last smoothing reading
-  digitalWrite(MOISTURE_POWER_PIN, HIGH); // Turn moisture power pin on
-  wait(200); // Set a delay to ensure the moisture sensor has powered up
-  reading[readIndex] = analogRead(ANALOG_INPUT_MOISTURE); // Read analog moisture value
-  digitalWrite(MOISTURE_POWER_PIN, LOW); // Turn moisture power pin off
+  // Subtract the last smoothing current_smoothing_reading
+  smoothing_total = smoothing_total - current_smoothing_reading[smoothing_read_index];
+  // Turn moisture power pin on
+  digitalWrite(MOISTURE_POWER_PIN, HIGH);
+  // Set a delay to ensure the moisture sensor has settled
+  wait(200);
+  // Read analog moisture value
+  current_smoothing_reading[smoothing_read_index] = analogRead(ANALOG_INPUT_MOISTURE);
+  // Turn moisture power pin off to prevent oxidation
+  digitalWrite(MOISTURE_POWER_PIN, LOW);
 #ifdef MY_DEBUG
   Serial.print("Moisture: ");
-  Serial.println(reading[readIndex]);
+  Serial.println(current_smoothing_reading[smoothing_read_index]);
 #endif
-  total = total + reading[readIndex]; // Add the reading to the smoothing total
-  readIndex = readIndex + 1; // Advance to the next position in the smoothing array
-  if (readIndex >= numReadings) // If we're at the end of the array...
-  {
-    readingsReady = true;
-    readIndex = 0; // Wrap around to the beginning
+  // Add the current_smoothing_reading to the smoothing smoothing_total
+  smoothing_total = smoothing_total + current_smoothing_reading[smoothing_read_index];
+  // Advance to the next position in the smoothing array
+  smoothing_read_index = smoothing_read_index + 1;
+  // If we're at the end of the array...
+  if (smoothing_read_index >= smoothing_readings) {
+    smoothing_readings_ready = true;
+    // Wrap around to the beginning
+    smoothing_read_index = 0;
   }
-  if (readingsReady)
-  {
-    average = total / numReadings;
-    average = map(average, 0, 1023, 1023, 0);
-    if (average <= moistureLimit)
-    {
-      moistureValue = 1;
+  if (smoothing_readings_ready) {
+    smoothing_average = smoothing_total / smoothing_readings;
+    smoothing_average = map(smoothing_average, 0, 1023, 1023, 0);
+    if (smoothing_average <= moisture_limit) {
+      moisture_value = 1;
     }
-    else
-    {
-      moistureValue = 0;
+    else {
+      moisture_value = 0;
     }
   }
 #if COMPARE_MOISTURE == 1
-  if (moistureValue != lastMoistureValue)
+  if (moisture_value != last_moisture_value)
 #endif
   {
 #ifdef MY_DEBUG
     Serial.print("Moisture: ");
-    Serial.println(moistureValue);
-    Serial.print("Moisture Avg: ");
-    Serial.println(average);
+    Serial.println(moisture_value);
+    Serial.print("Moisture average: ");
+    Serial.println(smoothing_average);
 #endif
     {
-      resend(msg1.set(moistureValue == 0 ? 1 : 0), radioRetries); // Send the inverse
-      // wait(RADIO_PAUSE);
-      resend(msg2.set(average), radioRetries);
-      // wait(RADIO_PAUSE);
-      lastMoistureValue = moistureValue; // For testing can be 0 or 1 or back to moistureValue
+      // Send the inverse
+      resend(msg1.set(moisture_value == 0 ? 1 : 0), radio_retries);
+      wait(RADIO_PAUSE);
+      resend(msg2.set(smoothing_average), radio_retries);
+      wait(RADIO_PAUSE);
+      // For testing can be 0 or 1 or back to moisture_value
+      last_moisture_value = moisture_value;
     }
   }
 #endif
 
-  wait(SENSORS_DELAY); // Wait after sensor readings
+  wait(SENSOR_DELAY);
 
   //*** RAIN SENSOR *****************************************
 
-  digitalWrite(RAIN_POWER_PIN, HIGH); // Turn rain power pin on
-  wait(200); // Set a delay to ensure the moisture sensor has powered up
-  int rainValue = digitalRead(DIGITAL_INPUT_RAIN); // Read digital rain value
-  digitalWrite(RAIN_POWER_PIN, LOW); // Turn rain power pin off
+  // Turn rain power pin on
+  digitalWrite(RAIN_POWER_PIN, HIGH);
+  // Set a delay to ensure the rain sensor has settled
+  wait(200);
+  // Read digital rain value
+  int rainValue = digitalRead(DIGITAL_INPUT_RAIN);
+  // Turn moisture power pin off to prevent oxidation
+  digitalWrite(RAIN_POWER_PIN, LOW);
+  // Check value against saved value
 #if COMPARE_RAIN == 1
-  if (rainValue != lastRainValue) // Check value against saved value
+  if (rainValue != last_rain_value)
 #endif
   {
 #ifdef MY_DEBUG
     Serial.print("Rain: ");
-    Serial.println(rainValue == 0 ? 1 : 0); // Print the inverse
+    // Print the inverse
+    Serial.println(rainValue == 0 ? 1 : 0);
 #endif
-    resend(msg3.set(rainValue == 0 ? 1 : 0), radioRetries); // Send the inverse
-    // wait(RADIO_PAUSE);
-    lastRainValue = rainValue; // For testing can be 0 or 1 or back to rainValue
+    // Send the inverse
+    resend(msg3.set(rainValue == 0 ? 1 : 0), radio_retries);
+    wait(RADIO_PAUSE);
+    // For testing can be 0 or 1 or back to rainValue
+    last_rain_value = rainValue;
   }
 
-  wait(SENSORS_DELAY); // Wait after sensor readings
+  wait(SENSOR_DELAY);
 
   //*** LUX SENSOR ******************************************
 
-  uint16_t lux = lightSensor.readLightLevel(); // Get Lux value
-
+  // Get Lux value
+  uint16_t lux = light_sensor.readLightLevel();
 #if COMPARE_LUX == 1
-  if (lux != lastlux)
+  if (lux != last_lux_value)
 #endif
   {
 #ifdef MY_DEBUG
     Serial.print("LUX: ");
     Serial.println(lux);
 #endif
-    resend(msg4.set(lux), radioRetries);
-    // wait(RADIO_PAUSE);
-    lastlux = lux;
+    resend(msg4.set(lux), radio_retries);
+    wait(RADIO_PAUSE);
+    last_lux_value = lux;
   }
 
-  wait(SENSORS_DELAY); // Wait between sensor readings
+  wait(SENSOR_DELAY);
 
   //*** DISTANCE SENSOR *************************************
 
+  // Get distance
   int dist = metric ? sonar.ping_cm() : sonar.ping_in();
 #if COMPARE_DIST == 1
-  if (dist != lastDist)
+  if (dist != last_distance_value)
 #endif
   {
 #ifdef MY_DEBUG
     Serial.print("Distance: ");
-    Serial.print(dist); // Convert ping time to distance in cm and print result (0 = outside set distance range)
+    Serial.print(dist);
     Serial.println(metric ? " cm" : " in");
 #endif
-    resend(msg5.set(dist), radioRetries);
-    // wait(RADIO_PAUSE);
-    lastDist = dist;
+    resend(msg5.set(dist), radio_retries);
+    wait(RADIO_PAUSE);
+    last_distance_value = dist;
   }
 
   //*** ANALYSE, SET, SEND TO GATEWAY ***********************
 
-  if (lastMoistureValue == 0 || lastRainValue == 0)
-  {
-    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(true),radioRetries); // Send message to mower node to activate relay
+  if (last_moisture_value == 0 || last_rain_value == 0) {
+    // Landroid relay tests
+    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(true),radio_retries); // Send message to mower node to activate relay
     // wait(RADIO_PAUSE);
-    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(false),radioRetries); // Send message to mower node to deactivate relay, as the timer will now be running
+    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(false),radio_retries); // Send message to mower node to deactivate relay, as the timer will now be running
     // wait(RADIO_PAUSE);
-    landroidWaiting = true;
-    landroidWaitingTriggered = true;
-    timeElapsed = 0;
-    setWaitingLights(strip1, 0, 4);
-    // strip1.setPixelColor(0, 255, 0, 0);
-    // strip1.setPixelColor(1, 255, 0, 0);
-    // strip1.setPixelColor(2, 255, 0, 0);
-    // strip1.setPixelColor(3, 255, 0, 0);
-    // strip1.show();
+    landroid_waiting = true;
+    landroid_waiting_triggered = true;
+    time_elapsed = 0;
+    setWaitingLights(strip_1, 0, 4);
+    // strip_1.setPixelColor(0, 255, 0, 0);
+    // strip_1.setPixelColor(1, 255, 0, 0);
+    // strip_1.setPixelColor(2, 255, 0, 0);
+    // strip_1.setPixelColor(3, 255, 0, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("Rain or moisture detected, waiting: ");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
 #endif
   }
-
-  else
-  {
-    landroidWaiting = false;
+  else {
+    landroid_waiting = false;
 #ifdef MY_DEBUG
     Serial.print("No rain or moisture detected, not waiting: ");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
 #endif
   }
 
-  if ( landroidWaiting == false && landroidWaitingTriggered == false )
-  {
-    setWaitingLights(strip1, 4, 4);
-    // strip1.setPixelColor(0, 0, 127, 0);
-    // strip1.setPixelColor(1, 0, 127, 0);
-    // strip1.setPixelColor(2, 0, 127, 0);
-    // strip1.setPixelColor(3, 0, 127, 0);
-    // strip1.show();
+  if ( landroid_waiting == false && landroid_waiting_triggered == false ) {
+    setWaitingLights(strip_1, 4, 4);
+    // strip_1.setPixelColor(0, 0, 127, 0);
+    // strip_1.setPixelColor(1, 0, 127, 0);
+    // strip_1.setPixelColor(2, 0, 127, 0);
+    // strip_1.setPixelColor(3, 0, 127, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("Waiting on normal schedule: ");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
 #endif
   }
 
-  if ( landroidWaiting == false && landroidWaitingTriggered == true && timeElapsed < TIMER1 ) // Logic for timer trigger
-  {
-    setWaitingLights(strip1, 0, 4);
-    // strip1.setPixelColor(0, 255, 0, 0);
-    // strip1.setPixelColor(1, 255, 0, 0);
-    // strip1.setPixelColor(2, 255, 0, 0);
-    // strip1.setPixelColor(3, 255, 0, 0);
-    // strip1.show();
+  // Logic for timer
+  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed < TIMER1 ) {
+    // strip_1.setPixelColor(0, 255, 0, 0);
+    // strip_1.setPixelColor(1, 255, 0, 0);
+    // strip_1.setPixelColor(2, 255, 0, 0);
+    // strip_1.setPixelColor(3, 255, 0, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("4 Hours Left: ");
     Serial.println("4 LEDs");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(timeElapsed / 1000);
+    Serial.println(time_elapsed / 1000);
 #endif
   }
 
-  if ( landroidWaiting == false && landroidWaitingTriggered == true && timeElapsed > TIMER1 ) // Logic for timer trigger
-  {
-    setWaitingLights(strip1, 1, 4);
-    // strip1.setPixelColor(0, 0, 0, 0);
-    // strip1.setPixelColor(1, 255, 0, 0);
-    // strip1.setPixelColor(2, 255, 0, 0);
-    // strip1.setPixelColor(3, 255, 0, 0);
-    // strip1.show();
+  // Logic for timer trigger
+  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER1 ) {
+    setWaitingLights(strip_1, 1, 4);
+    // strip_1.setPixelColor(0, 0, 0, 0);
+    // strip_1.setPixelColor(1, 255, 0, 0);
+    // strip_1.setPixelColor(2, 255, 0, 0);
+    // strip_1.setPixelColor(3, 255, 0, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("3 Hours Left: ");
     Serial.println("3 LEDs");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(timeElapsed / 1000);
+    Serial.println(time_elapsed / 1000);
 #endif
   }
 
-  if ( landroidWaiting == false && landroidWaitingTriggered == true && timeElapsed > TIMER2 ) // Logic for timer trigger
-  {
-    setWaitingLights(strip1, 2, 4);
-    // strip1.setPixelColor(0, 0, 0, 0);
-    // strip1.setPixelColor(1, 0, 0, 0);
-    // strip1.setPixelColor(2, 255, 0, 0);
-    // strip1.setPixelColor(3, 255, 0, 0);
-    // strip1.show();
+  // Logic for timer trigger
+  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER2 ) {
+    setWaitingLights(strip_1, 2, 4);
+    // strip_1.setPixelColor(0, 0, 0, 0);
+    // strip_1.setPixelColor(1, 0, 0, 0);
+    // strip_1.setPixelColor(2, 255, 0, 0);
+    // strip_1.setPixelColor(3, 255, 0, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("2 Hours Left: ");
     Serial.println("2 LEDs");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(timeElapsed / 1000);
+    Serial.println(time_elapsed / 1000);
 #endif
   }
 
-  if ( landroidWaiting == false && landroidWaitingTriggered == true && timeElapsed > TIMER3 ) // Logic for timer trigger
-  {
-    setWaitingLights(strip1, 3, 4);
-    // strip1.setPixelColor(0, 0, 0, 0);
-    // strip1.setPixelColor(1, 0, 0, 0);
-    // strip1.setPixelColor(2, 0, 0, 0);
-    // strip1.setPixelColor(3, 255, 0, 0);
-    //strip1.show();
+  // Logic for timer trigger
+  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER3 ) {
+    setWaitingLights(strip_1, 3, 4);
+    // strip_1.setPixelColor(0, 0, 0, 0);
+    // strip_1.setPixelColor(1, 0, 0, 0);
+    // strip_1.setPixelColor(2, 0, 0, 0);
+    // strip_1.setPixelColor(3, 255, 0, 0);
+    //strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("1 Hour Left: ");
     Serial.println("1 LEDs");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(timeElapsed / 1000);
+    Serial.println(time_elapsed / 1000);
 #endif
   }
 
-  if ( landroidWaiting == false && landroidWaitingTriggered == true && timeElapsed > TIMER4 ) // Logic for timer trigger
-  {
-    landroidWaitingTriggered = false;
-    setWaitingLights(strip1, 4, 4);
-    // strip1.setPixelColor(0, 0, 127, 0);
-    // strip1.setPixelColor(1, 0, 127, 0);
-    // strip1.setPixelColor(2, 0, 127, 0);
-    // strip1.setPixelColor(3, 0, 127, 0);
-    // strip1.show();
+  // Logic for timer trigger
+  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER4 ) {
+    landroid_waiting_triggered = false;
+    setWaitingLights(strip_1, 4, 4);
+    // strip_1.setPixelColor(0, 0, 127, 0);
+    // strip_1.setPixelColor(1, 0, 127, 0);
+    // strip_1.setPixelColor(2, 0, 127, 0);
+    // strip_1.setPixelColor(3, 0, 127, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("4 Hours Passed: ");
     Serial.println("It's no longer wet! Waiting on normal schedule");
     Serial.print("Status");
     Serial.print("(");
-    Serial.print(landroidWaiting);
+    Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(timeElapsed / 1000);
+    Serial.println(time_elapsed / 1000);
 #endif
   }
 
-  if (lastDist < 30)
-  {
-    landroidHome = true;
-    setHomeLights(strip1, true);
-    // strip1.setPixelColor(4, 0, 127, 0);
-    // strip1.setPixelColor(5, 0, 127, 0);
-    // strip1.setPixelColor(6, 0, 127, 0);
-    // strip1.setPixelColor(7, 0, 127, 0);
-    // strip1.show();
+  // Logic for Landroid home logic
+  if (last_distance_value < 30) {
+    landroid_home = true;
+    setHomeLights(strip_1, true);
+    // strip_1.setPixelColor(4, 0, 127, 0);
+    // strip_1.setPixelColor(5, 0, 127, 0);
+    // strip_1.setPixelColor(6, 0, 127, 0);
+    // strip_1.setPixelColor(7, 0, 127, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.println("Home charging");
 #endif
   }
 
-  else
-  {
-    landroidHome = false;
-    setHomeLights(strip1, false);
-    // strip1.setPixelColor(4, 255, 0, 0);
-    // strip1.setPixelColor(5, 255, 0, 0);
-    // strip1.setPixelColor(6, 255, 0, 0);
-    // strip1.setPixelColor(7, 255, 0, 0);
-    // strip1.show();
+  else {
+    landroid_home = false;
+    setHomeLights(strip_1, false);
+    // strip_1.setPixelColor(4, 255, 0, 0);
+    // strip_1.setPixelColor(5, 255, 0, 0);
+    // strip_1.setPixelColor(6, 255, 0, 0);
+    // strip_1.setPixelColor(7, 255, 0, 0);
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.println("Cutting the grass!");
 #endif
@@ -546,104 +581,94 @@ void loop()
 
   // Send Landroid home status to gateway
 #ifdef MY_DEBUG
-  Serial.print("Sending landroidHome ");
+  Serial.print("Sending landroid_home ");
   Serial.print("(");
-  Serial.print(landroidHome);
+  Serial.print(landroid_home);
   Serial.print(")");
   Serial.print(" status: ");
 #endif
-  resend(msg10.set(landroidHome), radioRetries);
-  // wait(RADIO_PAUSE);
+  resend(msg10.set(landroid_home), radio_retries);
+  wait(RADIO_PAUSE);
 
   // Send Landroid waiting status to gateway
 #ifdef MY_DEBUG
-  Serial.print("Sending landroidWaitingTriggered ");
+  Serial.print("Sending landroid_waiting_triggered ");
   Serial.print("(");
-  Serial.print(landroidWaitingTriggered);
+  Serial.print(landroid_waiting_triggered);
   Serial.print(")");
   Serial.print(" status: ");
 #endif
-  resend(msg11.set(landroidWaitingTriggered), radioRetries);
-  // wait(RADIO_PAUSE);
+  resend(msg11.set(landroid_waiting_triggered), radio_retries);
+  wait(RADIO_PAUSE);
 
   // Send Landroid waiting timer status to gateway
-  if ( landroidWaitingTriggered == true && timeElapsed > LOOP_PAUSE && timeElapsed < TIMER4)
-  {
+  if ( landroid_waiting_triggered == true && time_elapsed > LOOP_PAUSE && time_elapsed < TIMER4) {
 #ifdef MY_DEBUG
-    Serial.print("Sending timeElapsed ");
+    Serial.print("Sending time_elapsed ");
     Serial.print("(");
-    Serial.print(timeElapsed / 1000);
+    Serial.print(time_elapsed / 1000);
     Serial.print(")");
     Serial.print(" status: ");
 #endif
-    resend(msg12.set(timeElapsed / 1000), radioRetries);
-    // wait(RADIO_PAUSE);
+    resend(msg12.set(time_elapsed / 1000), radio_retries);
+    wait(RADIO_PAUSE);
   }
 
   else
   {
 #ifdef MY_DEBUG
-    Serial.print("Sending timeElapsed ");
+    Serial.print("Sending time_elapsed ");
     Serial.print("(");
     Serial.print(0);
     Serial.print(")");
     Serial.print(" status: ");
 #endif
-    resend(msg12.set(0), radioRetries);
-    // wait(RADIO_PAUSE);
+    resend(msg12.set(0), radio_retries);
+    wait(RADIO_PAUSE);
   }
 
-  wait(LOOP_PAUSE); // Sleep or wait (repeater)
+  wait(LOOP_PAUSE);
 }
 
-void setHomeLights(Adafruit_NeoPixel & strip1, boolean isGreen)
-{
-  for (int i = 4; i < 8; ++i)
-  {
-    if (isGreen)
-    {
-      strip1.setPixelColor(i, 0, 10, 0);
-    }
-    else
-    {
-      strip1.setPixelColor(i, 50, 0, 0);
-    }
-  }
-  strip1.show();
-}
-
-void setWaitingLights(Adafruit_NeoPixel & strip1, int enabledLeds, int totalLeds)
-{
-  for (int i = 0; i < enabledLeds; ++i)
-  {
-    strip1.setPixelColor(i, 0, 10, 0);
-  }
-  for (int i = enabledLeds; i < totalLeds; ++i)
-  {
-    strip1.setPixelColor(i, 50, 0, 0);
-  }
-  strip1.show();
-}
-
-void resend(MyMessage &msg, int repeats) {
-  int repeat = 0;
-  int repeatdelay = 0;
-  boolean sendOK = false;
-
-  while ((sendOK == false) and (repeat < radioRetries)) {
-    if (send(msg)) {
-      sendOK = true;
+void setHomeLights(Adafruit_NeoPixel & strip_1, boolean is_green) {
+  for (int i = 4; i < 8; ++i) {
+    if (is_green) {
+      strip_1.setPixelColor(i, 0, 10, 0);
     }
     else {
-      sendOK = false;
-      repeatdelay += random(50, 200);
+      strip_1.setPixelColor(i, 50, 0, 0);
+    }
+  }
+  strip_1.show();
+}
+
+void setWaitingLights(Adafruit_NeoPixel & strip_1, int enabled_leds, int total_leds) {
+  for (int i = 0; i < enabled_leds; ++i) {
+    strip_1.setPixelColor(i, 0, 10, 0);
+  }
+  for (int i = enabled_leds; i < total_leds; ++i) {
+    strip_1.setPixelColor(i, 50, 0, 0);
+  }
+  strip_1.show();
+}
+
+void resend(MyMessage & msg, int repeats) {
+  int repeat = 0;
+  int repeat_delay = 0;
+  boolean send_ok = false;
+  while ((send_ok == false) and (repeat < radio_retries)) {
+    if (send(msg)) {
+      send_ok = true;
+    }
+    else {
+      send_ok = false;
+      repeat_delay += random(50, 200);
 #ifdef MY_DEBUG
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
 #endif
     }
     repeat++;
-    wait(repeatdelay);
+    wait(repeat_delay);
   }
 }
-
