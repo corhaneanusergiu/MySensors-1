@@ -7,6 +7,7 @@
   V2.0 - Integrated moisture sensor and optimised code
   V2.1 - Minor formatting changes
   V3.0 - Refactor and added timer logic
+  V3.1 - Updated gateway metric logic
 */
 
 //*** EXTERNAL LIBRARIES **********************************
@@ -49,7 +50,7 @@
 
 #define SKETCH_NAME "Shed"
 #define SKETCH_MAJOR_VER "3"
-#define SKETCH_MINOR_VER "0"
+#define SKETCH_MINOR_VER "1"
 
 // Define the sensor child IDs
 #define CHILD_ID1 1 // Temperature
@@ -58,6 +59,9 @@
 // Define the message formats
 MyMessage msg1(CHILD_ID1, V_TEMP);
 MyMessage msg2(CHILD_ID2, V_LEVEL);
+
+// Set default gateway value for metric or imperial
+boolean metric = true;
 
 // *** SENSORS CONFIG *************************************
 
@@ -114,21 +118,26 @@ int radio_retries = 10;
 
 //*********************************************************
 
-void before() {
+void before()
+{
   // Startup up the OneWire library
   sensors.begin();
 }
 
-void setup() {
+void setup()
+{
   // RequestTemperatures() will not block current thread
   sensors.setWaitForConversion(false);
   // Set the moisture sensor power pin as output
   pinMode(MOISTURE_POWER_PIN, OUTPUT);
   // Set to LOW so no power is flowing through the moisture sensor
   digitalWrite(MOISTURE_POWER_PIN, LOW);
+  // Check gateway for metric setting
+  boolean metric = getConfig().isMetric;
 }
 
-void presentation() {
+void presentation()
+{
   // Send the sketch version information to the gateway and controller
   sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
   // Fetch the number of attached temperature sensors
@@ -140,8 +149,8 @@ void presentation() {
   }
 }
 
-void loop() {
-
+void loop()
+{
   //*** TEMP SENSOR ***************************************
 
   // Fetch temperatures from Dallas sensors
@@ -153,9 +162,11 @@ void loop() {
   // Read temperatures and send them to gateway and controller
   for (int i = 0; i < num_sensors && i < MAX_ATTACHED_DS18B20; i++) {
     // Fetch and round temperature to one decimal
-    float temperature = static_cast<float>(static_cast<int>((getConfig().isMetric ? sensors.getTempCByIndex(i) : sensors.getTempFByIndex(i)) * 10.)) / 10.;
-    float temperature_difference = temperature - last_temperature[i]; // The absolute difference
-    temperature_difference = abs(temperature_difference); // 'abs' is the absolute value, the result is always positive
+    float temperature = static_cast<float>(static_cast<int>((metric ? sensors.getTempCByIndex(i) : sensors.getTempFByIndex(i)) * 10.)) / 10.;
+    // The absolute difference
+    float temperature_difference = temperature - last_temperature[i];
+    // 'abs' is the absolute value, the result is always positive
+    temperature_difference = abs(temperature_difference);
 #ifdef MY_DEBUG
     Serial.print("Temperature: ");
     Serial.println(temperature);
@@ -204,8 +215,10 @@ void loop() {
   if (readings_ready) {
     average = total / num_readings;
   }
-  int moisture_difference = average - last_moisture_value; // The absolute difference
-  moisture_difference = abs(moisture_difference); // 'abs' is the absolute value, the result is always positive
+  // The absolute difference
+  int moisture_difference = average - last_moisture_value;
+  // 'abs' is the absolute value, the result is always positive
+  moisture_difference = abs(moisture_difference);
 #ifdef MY_DEBUG
   Serial.print("Moisture Avg: ");
   Serial.println(average);
@@ -217,23 +230,24 @@ void loop() {
   }
 }
 
-void resend(MyMessage &msg, int repeats) {
+void resend(MyMessage& msg, int repeats)
+{
   int repeat = 0;
-  int repeatdelay = 0;
-  boolean sendOK = false;
-  while ((sendOK == false) and (repeat < radio_retries)) {
+  int repeat_delay = 0;
+  boolean send_ok = false;
+  while ((send_ok == false) and (repeat < radio_retries)) {
     if (send(msg)) {
-      sendOK = true;
+      send_ok = true;
     }
     else {
-      sendOK = false;
-      repeatdelay += random(50, 200);
+      send_ok = false;
+      repeat_delay += random(50, 200);
 #ifdef MY_DEBUG
       Serial.print(F("Send ERROR "));
       Serial.println(repeat);
 #endif
     }
     repeat++;
-    wait(repeatdelay);
+    wait(repeat_delay);
   }
 }

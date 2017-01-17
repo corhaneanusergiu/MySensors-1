@@ -8,7 +8,8 @@
   V1.8 - Shortened Sketch Narme (Prevent send presentation errors)
   V1.9 - Moved LED to a seperate function
   V2.0 - Corrected presentation function
-  V2.1 - Preventing moisture current_smoothing_readings being set or sent until analog smoothing in place
+  V2.1 - Preventing moisture current_smoothing_readings being set or sent until
+  analog smoothing in place
   V2.2 - Added mower relay activate / deactivate logic
   V2.3 - Added message failure retry function
   V2.4 - Optimised resend, also changed delay to wait
@@ -74,8 +75,8 @@ int radio_retries = 10;
 
 // NeoPixel settings
 #define NEO_PIN 2
-#define NUM_LEDS 8
-Adafruit_NeoPixel strip_1 = Adafruit_NeoPixel(NUM_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
+#define NEO_LEDS 8
+Adafruit_NeoPixel strip_1 = Adafruit_NeoPixel(NEO_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
 // Set moisture mode to either digital (D) or analog (A)
 #define MOISTURE_MODE_A
@@ -126,7 +127,8 @@ int last_rain_value = -1;
 #define TRIGGER_PIN 4
 // Ultrasonic echo pin
 #define ECHO_PIN 3
-// Maximum distance to ping in cms (maximum sensor distance is rated at 400-500cm)
+// Maximum distance to ping in cms (maximum sensor distance is rated at
+// 400-500cm)
 #define MAX_DISTANCE 300
 // NewPing setup of pins and maximum distance
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
@@ -384,7 +386,7 @@ void loop()
 
   //*** DISTANCE SENSOR *************************************
 
-  // Get distance
+  // Get distance based on metric boolean
   int dist = metric ? sonar.ping_cm() : sonar.ping_in();
 #if COMPARE_DIST == 1
   if (dist != last_distance_value)
@@ -393,6 +395,7 @@ void loop()
 #ifdef MY_DEBUG
     Serial.print("Distance: ");
     Serial.print(dist);
+    // Display unit of measure based on metric boolean
     Serial.println(metric ? " cm" : " in");
 #endif
     resend(msg5.set(dist), radio_retries);
@@ -404,9 +407,12 @@ void loop()
 
   if (last_moisture_value == 0 || last_rain_value == 0) {
     // Landroid relay tests
-    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(true),radio_retries); // Send message to mower node to activate relay
+    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(true),radio_retries);
+    // // Send message to mower node to activate relay
     // wait(RADIO_PAUSE);
-    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(false),radio_retries); // Send message to mower node to deactivate relay, as the timer will now be running
+    // resend(MyMessage(1, V_LIGHT).setDestination(4).set(false),radio_retries);
+    // // Send message to mower node to deactivate relay, as the timer will now
+    // be running
     // wait(RADIO_PAUSE);
     landroid_waiting = true;
     landroid_waiting_triggered = true;
@@ -425,6 +431,7 @@ void loop()
     Serial.println(")");
 #endif
   }
+
   else {
     landroid_waiting = false;
 #ifdef MY_DEBUG
@@ -436,7 +443,7 @@ void loop()
 #endif
   }
 
-  if ( landroid_waiting == false && landroid_waiting_triggered == false ) {
+  if (landroid_waiting == false && landroid_waiting_triggered == false) {
     setWaitingLights(strip_1, 4, 4);
     // strip_1.setPixelColor(0, 0, 127, 0);
     // strip_1.setPixelColor(1, 0, 127, 0);
@@ -453,7 +460,7 @@ void loop()
   }
 
   // Logic for timer
-  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed < TIMER1 ) {
+  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed < TIMER1) {
     // strip_1.setPixelColor(0, 255, 0, 0);
     // strip_1.setPixelColor(1, 255, 0, 0);
     // strip_1.setPixelColor(2, 255, 0, 0);
@@ -472,7 +479,7 @@ void loop()
   }
 
   // Logic for timer trigger
-  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER1 ) {
+  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER1) {
     setWaitingLights(strip_1, 1, 4);
     // strip_1.setPixelColor(0, 0, 0, 0);
     // strip_1.setPixelColor(1, 255, 0, 0);
@@ -492,7 +499,7 @@ void loop()
   }
 
   // Logic for timer trigger
-  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER2 ) {
+  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER2) {
     setWaitingLights(strip_1, 2, 4);
     // strip_1.setPixelColor(0, 0, 0, 0);
     // strip_1.setPixelColor(1, 0, 0, 0);
@@ -512,13 +519,13 @@ void loop()
   }
 
   // Logic for timer trigger
-  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER3 ) {
+  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER3) {
     setWaitingLights(strip_1, 3, 4);
     // strip_1.setPixelColor(0, 0, 0, 0);
     // strip_1.setPixelColor(1, 0, 0, 0);
     // strip_1.setPixelColor(2, 0, 0, 0);
     // strip_1.setPixelColor(3, 255, 0, 0);
-    //strip_1.show();
+    // strip_1.show();
 #ifdef MY_DEBUG
     Serial.print("1 Hour Left: ");
     Serial.println("1 LEDs");
@@ -532,7 +539,7 @@ void loop()
   }
 
   // Logic for timer trigger
-  if ( landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER4 ) {
+  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER4) {
     landroid_waiting_triggered = false;
     setWaitingLights(strip_1, 4, 4);
     // strip_1.setPixelColor(0, 0, 127, 0);
@@ -602,7 +609,7 @@ void loop()
   wait(RADIO_PAUSE);
 
   // Send Landroid waiting timer status to gateway
-  if ( landroid_waiting_triggered == true && time_elapsed > LOOP_PAUSE && time_elapsed < TIMER4) {
+  if (landroid_waiting_triggered == true && time_elapsed > LOOP_PAUSE && time_elapsed < TIMER4) {
 #ifdef MY_DEBUG
     Serial.print("Sending time_elapsed ");
     Serial.print("(");
@@ -613,9 +620,7 @@ void loop()
     resend(msg12.set(time_elapsed / 1000), radio_retries);
     wait(RADIO_PAUSE);
   }
-
-  else
-  {
+  else {
 #ifdef MY_DEBUG
     Serial.print("Sending time_elapsed ");
     Serial.print("(");
@@ -630,7 +635,8 @@ void loop()
   wait(LOOP_PAUSE);
 }
 
-void setHomeLights(Adafruit_NeoPixel & strip_1, boolean is_green) {
+void setHomeLights(Adafruit_NeoPixel& strip_1, boolean is_green)
+{
   for (int i = 4; i < 8; ++i) {
     if (is_green) {
       strip_1.setPixelColor(i, 0, 10, 0);
@@ -642,7 +648,8 @@ void setHomeLights(Adafruit_NeoPixel & strip_1, boolean is_green) {
   strip_1.show();
 }
 
-void setWaitingLights(Adafruit_NeoPixel & strip_1, int enabled_leds, int total_leds) {
+void setWaitingLights(Adafruit_NeoPixel& strip_1, int enabled_leds, int total_leds)
+{
   for (int i = 0; i < enabled_leds; ++i) {
     strip_1.setPixelColor(i, 0, 10, 0);
   }
@@ -652,7 +659,8 @@ void setWaitingLights(Adafruit_NeoPixel & strip_1, int enabled_leds, int total_l
   strip_1.show();
 }
 
-void resend(MyMessage & msg, int repeats) {
+void resend(MyMessage& msg, int repeats)
+{
   int repeat = 0;
   int repeat_delay = 0;
   boolean send_ok = false;

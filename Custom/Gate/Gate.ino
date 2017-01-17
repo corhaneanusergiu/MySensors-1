@@ -81,14 +81,16 @@ Vcc vcc(vcc_correction);
 
 // *** BEGIN **********************************************
 
-void setup() {
+void setup()
+{
   // Setup the contact sensor
   pinMode(PRIMARY_BUTTON_PIN, INPUT);
   // Activate or deactivate the internal pull-up - high if using internal resistor or low if using external
   digitalWrite(PRIMARY_BUTTON_PIN, LOW);
 }
 
-void presentation() {
+void presentation()
+{
   // Send the sketch version information to the gateway and controller
   sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
   // Register all sensors to the gateway
@@ -97,13 +99,14 @@ void presentation() {
   present(CHILD_ID3, S_CUSTOM);
 }
 
-void loop() {
+void loop()
+{
   // Debouce using sleep
   sleep(DEBOUNCE_SLEEP);
   int value = digitalRead(PRIMARY_BUTTON_PIN);
   // If value has changed send the updated value
   if (value != old_value) {
-    send(msg.set(value == HIGH ? 0 : 1 ));
+    send(msg.set(value == HIGH ? 0 : 1));
     old_value = value;
   }
   // Read battery voltage
