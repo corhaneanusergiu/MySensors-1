@@ -16,7 +16,7 @@
 //*** MY SENSORS ******************************************
 
 // Enable debug prints
-#define MY_DEBUG
+// #define MY_DEBUG
 
 // Lower serial speed if using 1Mhz clock
 // #define MY_BAUD_RATE 9600
@@ -202,7 +202,7 @@ void loop() {
   if (readings_ready) {
     average = total / num_readings;
   }
-  float moisture_difference = average - last_moisture_value; // The absolute difference
+  int moisture_difference = average - last_moisture_value; // The absolute difference
   moisture_difference = abs(moisture_difference); // 'abs' is the absolute value, the result is always positive
 #ifdef MY_DEBUG
   Serial.print("Moisture Avg: ");

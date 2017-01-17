@@ -2,7 +2,8 @@
   REVISION HISTORY
   Created by Mark Swift
   V1.2 - Added sleep time to force daily update
-  V1.3 - Deactivate pullup on setup. Added oldValue logic.
+  V1.3 - Deactivate pullup on setup and added oldValue logic
+  V1.4 - Added daily wakeup to sleep
 */
 
 //*** EXTERNAL LIBRARIES **********************************
@@ -40,7 +41,7 @@
 
 #define SKETCH_NAME "Door Sensor"
 #define SKETCH_MAJOR_VER "1"
-#define SKETCH_MINOR_VER "3"
+#define SKETCH_MINOR_VER "4"
 
 #define CHILD_ID1 1
 #define CHILD_ID2 2
