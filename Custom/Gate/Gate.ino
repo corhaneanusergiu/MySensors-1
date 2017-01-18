@@ -48,9 +48,9 @@
 #define SKETCH_MINOR_VER "5"
 
 // Define the sensor child IDs
-#define CHILD_ID1 1
-#define CHILD_ID2 2
-#define CHILD_ID3 3
+#define CHILD_ID1 1 // Switch
+#define CHILD_ID2 2 // Battery voltage
+#define CHILD_ID3 3 // Battery percent
 
 // Define the message formats
 MyMessage msg(CHILD_ID1, V_TRIPPED);
