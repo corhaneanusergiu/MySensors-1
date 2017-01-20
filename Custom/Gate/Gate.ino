@@ -13,15 +13,23 @@
 
 //*** MYSENSORS *******************************************
 
-// Enable debug prints
+// Enable debug serial prints
 // #define MY_DEBUG
 
 // Lower serial speed if using 1Mhz clock
 // #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 4
-#define MY_PARENT_NODE_ID 1 // AUTO
-#define MY_PARENT_NODE_IS_STATIC
+// #define MY_PARENT_NODE_ID 1
+// #define MY_PARENT_NODE_IS_STATIC
+
+// Transport ready boot timeout default is 0 meaning no timeout
+// Set to 60 seconds on battery nodes to avoid excess drainage
+#define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
+
+// Transport ready loop timeout default is 10 seconds
+// Usually left at default but can be extended if required
+// #define MY_SLEEP_TRANSPORT_RECONNECT_TIMEOUT_MS (10*1000UL)
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -66,7 +74,7 @@ MyMessage msg3(CHILD_ID3, V_CUSTOM);
 #define DEBOUNCE_SLEEP 5
 
 // Sleep timer in milliseconds
-#define SLEEP_IN_MS 86400000
+#define SLEEP_IN_MS 86400000UL
 
 // Store the old value for comparison
 int old_value = -1;

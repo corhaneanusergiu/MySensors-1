@@ -32,8 +32,16 @@
 // #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 3
-#define MY_PARENT_NODE_ID AUTO // AUTO
-// #define MY_PARENT_NODE_IS_STATIC
+#define MY_PARENT_NODE_ID 0
+#define MY_PARENT_NODE_IS_STATIC
+
+// Transport ready boot timeout default is 0 meaning no timeout
+// Set to 60 seconds on battery nodes to avoid excess drainage
+// #define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
+
+// Transport ready loop timeout default is 10 seconds
+// Usually left at default but can be extended if required
+// #define MY_SLEEP_TRANSPORT_RECONNECT_TIMEOUT_MS (10*1000UL)
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -76,7 +84,7 @@ int radio_retries = 10;
 // NeoPixel settings
 #define NEO_PIN 2
 #define NEO_LEDS 8
-Adafruit_NeoPixel strip_1 = Adafruit_NeoPixel(NEO_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel stripOne = Adafruit_NeoPixel(NEO_LEDS, NEO_PIN, NEO_GRB + NEO_KHZ800);
 
 // Set moisture mode to either digital (D) or analog (A)
 #define MOISTURE_MODE_A
@@ -127,8 +135,7 @@ int last_rain_value = -1;
 #define TRIGGER_PIN 4
 // Ultrasonic echo pin
 #define ECHO_PIN 3
-// Maximum distance to ping in cms (maximum sensor distance is rated at
-// 400-500cm)
+// Maximum distance to ping in cms (maximum sensor distance is rated at 400-500cm
 #define MAX_DISTANCE 300
 // NewPing setup of pins and maximum distance
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
@@ -138,7 +145,7 @@ NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 int last_distance_value = -1;
 
 // Set BH1750 name
-BH1750 light_sensor;
+BH1750 lightSensor;
 // Send only if changed? 1 = Yes 0 = No
 #define COMPARE_LUX 0
 // Store last LUX current_smoothing_reading for comparison
@@ -148,7 +155,7 @@ uint16_t last_lux_value = -1;
 boolean landroid_waiting = false;
 boolean landroid_waiting_triggered = false;
 boolean landroid_home = false;
-elapsedMillis time_elapsed;
+elapsedMillis timeElapsed;
 
 // Landroid timers
 #define TIMER1 3200000 // 60 minutes * 60 seconds * 1000 millis = 3200000
@@ -210,13 +217,13 @@ void setup()
   // Set to LOW so no power is flowing through the rain sensor
   digitalWrite(RAIN_POWER_PIN, LOW);
   // Check gateway for metric setting
-  boolean metric = getConfig().isMetric;
+  metric = getControllerConfig().isMetric;
   // Start BH1750 light sensor
-  light_sensor.begin();
+  lightSensor.begin();
   // Start NeoPixel LED strip
-  strip_1.begin();
+  stripOne.begin();
   // Initialise all Neopixel LEDs off
-  strip_1.show();
+  stripOne.show();
 }
 
 void presentation()
@@ -368,7 +375,7 @@ void loop()
   //*** LUX SENSOR ******************************************
 
   // Get Lux value
-  uint16_t lux = light_sensor.readLightLevel();
+  uint16_t lux = lightSensor.readLightLevel();
 #if COMPARE_LUX == 1
   if (lux != last_lux_value)
 #endif
@@ -416,13 +423,13 @@ void loop()
     // wait(RADIO_PAUSE);
     landroid_waiting = true;
     landroid_waiting_triggered = true;
-    time_elapsed = 0;
-    setWaitingLights(strip_1, 0, 4);
-    // strip_1.setPixelColor(0, 255, 0, 0);
-    // strip_1.setPixelColor(1, 255, 0, 0);
-    // strip_1.setPixelColor(2, 255, 0, 0);
-    // strip_1.setPixelColor(3, 255, 0, 0);
-    // strip_1.show();
+    timeElapsed = 0;
+    setWaitingLights(stripOne, 0, 4);
+    // stripOne.setPixelColor(0, 255, 0, 0);
+    // stripOne.setPixelColor(1, 255, 0, 0);
+    // stripOne.setPixelColor(2, 255, 0, 0);
+    // stripOne.setPixelColor(3, 255, 0, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("Rain or moisture detected, waiting: ");
     Serial.print("Status");
@@ -444,12 +451,12 @@ void loop()
   }
 
   if (landroid_waiting == false && landroid_waiting_triggered == false) {
-    setWaitingLights(strip_1, 4, 4);
-    // strip_1.setPixelColor(0, 0, 127, 0);
-    // strip_1.setPixelColor(1, 0, 127, 0);
-    // strip_1.setPixelColor(2, 0, 127, 0);
-    // strip_1.setPixelColor(3, 0, 127, 0);
-    // strip_1.show();
+    setWaitingLights(stripOne, 4, 4);
+    // stripOne.setPixelColor(0, 0, 127, 0);
+    // stripOne.setPixelColor(1, 0, 127, 0);
+    // stripOne.setPixelColor(2, 0, 127, 0);
+    // stripOne.setPixelColor(3, 0, 127, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("Waiting on normal schedule: ");
     Serial.print("Status");
@@ -460,12 +467,12 @@ void loop()
   }
 
   // Logic for timer
-  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed < TIMER1) {
-    // strip_1.setPixelColor(0, 255, 0, 0);
-    // strip_1.setPixelColor(1, 255, 0, 0);
-    // strip_1.setPixelColor(2, 255, 0, 0);
-    // strip_1.setPixelColor(3, 255, 0, 0);
-    // strip_1.show();
+  if (landroid_waiting == false && landroid_waiting_triggered == true && timeElapsed < TIMER1) {
+    // stripOne.setPixelColor(0, 255, 0, 0);
+    // stripOne.setPixelColor(1, 255, 0, 0);
+    // stripOne.setPixelColor(2, 255, 0, 0);
+    // stripOne.setPixelColor(3, 255, 0, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("4 Hours Left: ");
     Serial.println("4 LEDs");
@@ -474,18 +481,18 @@ void loop()
     Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(time_elapsed / 1000);
+    Serial.println(timeElapsed / 1000);
 #endif
   }
 
   // Logic for timer trigger
-  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER1) {
-    setWaitingLights(strip_1, 1, 4);
-    // strip_1.setPixelColor(0, 0, 0, 0);
-    // strip_1.setPixelColor(1, 255, 0, 0);
-    // strip_1.setPixelColor(2, 255, 0, 0);
-    // strip_1.setPixelColor(3, 255, 0, 0);
-    // strip_1.show();
+  if (landroid_waiting == false && landroid_waiting_triggered == true && timeElapsed > TIMER1) {
+    setWaitingLights(stripOne, 1, 4);
+    // stripOne.setPixelColor(0, 0, 0, 0);
+    // stripOne.setPixelColor(1, 255, 0, 0);
+    // stripOne.setPixelColor(2, 255, 0, 0);
+    // stripOne.setPixelColor(3, 255, 0, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("3 Hours Left: ");
     Serial.println("3 LEDs");
@@ -494,18 +501,18 @@ void loop()
     Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(time_elapsed / 1000);
+    Serial.println(timeElapsed / 1000);
 #endif
   }
 
   // Logic for timer trigger
-  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER2) {
-    setWaitingLights(strip_1, 2, 4);
-    // strip_1.setPixelColor(0, 0, 0, 0);
-    // strip_1.setPixelColor(1, 0, 0, 0);
-    // strip_1.setPixelColor(2, 255, 0, 0);
-    // strip_1.setPixelColor(3, 255, 0, 0);
-    // strip_1.show();
+  if (landroid_waiting == false && landroid_waiting_triggered == true && timeElapsed > TIMER2) {
+    setWaitingLights(stripOne, 2, 4);
+    // stripOne.setPixelColor(0, 0, 0, 0);
+    // stripOne.setPixelColor(1, 0, 0, 0);
+    // stripOne.setPixelColor(2, 255, 0, 0);
+    // stripOne.setPixelColor(3, 255, 0, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("2 Hours Left: ");
     Serial.println("2 LEDs");
@@ -514,18 +521,18 @@ void loop()
     Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(time_elapsed / 1000);
+    Serial.println(timeElapsed / 1000);
 #endif
   }
 
   // Logic for timer trigger
-  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER3) {
-    setWaitingLights(strip_1, 3, 4);
-    // strip_1.setPixelColor(0, 0, 0, 0);
-    // strip_1.setPixelColor(1, 0, 0, 0);
-    // strip_1.setPixelColor(2, 0, 0, 0);
-    // strip_1.setPixelColor(3, 255, 0, 0);
-    // strip_1.show();
+  if (landroid_waiting == false && landroid_waiting_triggered == true && timeElapsed > TIMER3) {
+    setWaitingLights(stripOne, 3, 4);
+    // stripOne.setPixelColor(0, 0, 0, 0);
+    // stripOne.setPixelColor(1, 0, 0, 0);
+    // stripOne.setPixelColor(2, 0, 0, 0);
+    // stripOne.setPixelColor(3, 255, 0, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("1 Hour Left: ");
     Serial.println("1 LEDs");
@@ -534,19 +541,19 @@ void loop()
     Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(time_elapsed / 1000);
+    Serial.println(timeElapsed / 1000);
 #endif
   }
 
   // Logic for timer trigger
-  if (landroid_waiting == false && landroid_waiting_triggered == true && time_elapsed > TIMER4) {
+  if (landroid_waiting == false && landroid_waiting_triggered == true && timeElapsed > TIMER4) {
     landroid_waiting_triggered = false;
-    setWaitingLights(strip_1, 4, 4);
-    // strip_1.setPixelColor(0, 0, 127, 0);
-    // strip_1.setPixelColor(1, 0, 127, 0);
-    // strip_1.setPixelColor(2, 0, 127, 0);
-    // strip_1.setPixelColor(3, 0, 127, 0);
-    // strip_1.show();
+    setWaitingLights(stripOne, 4, 4);
+    // stripOne.setPixelColor(0, 0, 127, 0);
+    // stripOne.setPixelColor(1, 0, 127, 0);
+    // stripOne.setPixelColor(2, 0, 127, 0);
+    // stripOne.setPixelColor(3, 0, 127, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.print("4 Hours Passed: ");
     Serial.println("It's no longer wet! Waiting on normal schedule");
@@ -555,19 +562,19 @@ void loop()
     Serial.print(landroid_waiting);
     Serial.println(")");
     Serial.print("Time elapsed: ");
-    Serial.println(time_elapsed / 1000);
+    Serial.println(timeElapsed / 1000);
 #endif
   }
 
   // Logic for Landroid home logic
   if (last_distance_value < 30) {
     landroid_home = true;
-    setHomeLights(strip_1, true);
-    // strip_1.setPixelColor(4, 0, 127, 0);
-    // strip_1.setPixelColor(5, 0, 127, 0);
-    // strip_1.setPixelColor(6, 0, 127, 0);
-    // strip_1.setPixelColor(7, 0, 127, 0);
-    // strip_1.show();
+    setHomeLights(stripOne, true);
+    // stripOne.setPixelColor(4, 0, 127, 0);
+    // stripOne.setPixelColor(5, 0, 127, 0);
+    // stripOne.setPixelColor(6, 0, 127, 0);
+    // stripOne.setPixelColor(7, 0, 127, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.println("Home charging");
 #endif
@@ -575,12 +582,12 @@ void loop()
 
   else {
     landroid_home = false;
-    setHomeLights(strip_1, false);
-    // strip_1.setPixelColor(4, 255, 0, 0);
-    // strip_1.setPixelColor(5, 255, 0, 0);
-    // strip_1.setPixelColor(6, 255, 0, 0);
-    // strip_1.setPixelColor(7, 255, 0, 0);
-    // strip_1.show();
+    setHomeLights(stripOne, false);
+    // stripOne.setPixelColor(4, 255, 0, 0);
+    // stripOne.setPixelColor(5, 255, 0, 0);
+    // stripOne.setPixelColor(6, 255, 0, 0);
+    // stripOne.setPixelColor(7, 255, 0, 0);
+    // stripOne.show();
 #ifdef MY_DEBUG
     Serial.println("Cutting the grass!");
 #endif
@@ -609,20 +616,20 @@ void loop()
   wait(RADIO_PAUSE);
 
   // Send Landroid waiting timer status to gateway
-  if (landroid_waiting_triggered == true && time_elapsed > LOOP_PAUSE && time_elapsed < TIMER4) {
+  if (landroid_waiting_triggered == true && timeElapsed > LOOP_PAUSE && timeElapsed < TIMER4) {
 #ifdef MY_DEBUG
-    Serial.print("Sending time_elapsed ");
+    Serial.print("Sending timeElapsed ");
     Serial.print("(");
-    Serial.print(time_elapsed / 1000);
+    Serial.print(timeElapsed / 1000);
     Serial.print(")");
     Serial.print(" status: ");
 #endif
-    resend(msg12.set(time_elapsed / 1000), radio_retries);
+    resend(msg12.set(timeElapsed / 1000), radio_retries);
     wait(RADIO_PAUSE);
   }
   else {
 #ifdef MY_DEBUG
-    Serial.print("Sending time_elapsed ");
+    Serial.print("Sending timeElapsed ");
     Serial.print("(");
     Serial.print(0);
     Serial.print(")");
@@ -635,28 +642,28 @@ void loop()
   wait(LOOP_PAUSE);
 }
 
-void setHomeLights(Adafruit_NeoPixel& strip_1, boolean is_green)
+void setHomeLights(Adafruit_NeoPixel& stripOne, boolean is_green)
 {
   for (int i = 4; i < 8; ++i) {
     if (is_green) {
-      strip_1.setPixelColor(i, 0, 10, 0);
+      stripOne.setPixelColor(i, 0, 10, 0);
     }
     else {
-      strip_1.setPixelColor(i, 50, 0, 0);
+      stripOne.setPixelColor(i, 50, 0, 0);
     }
   }
-  strip_1.show();
+  stripOne.show();
 }
 
-void setWaitingLights(Adafruit_NeoPixel& strip_1, int enabled_leds, int total_leds)
+void setWaitingLights(Adafruit_NeoPixel& stripOne, int enabled_leds, int total_leds)
 {
   for (int i = 0; i < enabled_leds; ++i) {
-    strip_1.setPixelColor(i, 0, 10, 0);
+    stripOne.setPixelColor(i, 0, 10, 0);
   }
   for (int i = enabled_leds; i < total_leds; ++i) {
-    strip_1.setPixelColor(i, 50, 0, 0);
+    stripOne.setPixelColor(i, 50, 0, 0);
   }
-  strip_1.show();
+  stripOne.show();
 }
 
 void resend(MyMessage& msg, int repeats)

@@ -22,8 +22,8 @@
 // #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 1
-#define MY_PARENT_NODE_ID AUTO // AUTO
-// #define MY_PARENT_NODE_IS_STATIC
+#define MY_PARENT_NODE_ID 0
+#define MY_PARENT_NODE_IS_STATIC
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24

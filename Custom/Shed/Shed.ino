@@ -25,8 +25,16 @@
 // #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 2
-#define MY_PARENT_NODE_ID AUTO // AUTO
+// #define MY_PARENT_NODE_ID 0
 // #define MY_PARENT_NODE_IS_STATIC
+
+// Transport ready boot timeout default is 0 meaning no timeout
+// Set to 60 seconds on battery nodes to avoid excess drainage
+// #define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
+
+// Transport ready loop timeout default is 10 seconds
+// Usually left at default but can be extended if required
+// #define MY_SLEEP_TRANSPORT_RECONNECT_TIMEOUT_MS (10*1000UL)
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
@@ -132,8 +140,8 @@ void setup()
   pinMode(MOISTURE_POWER_PIN, OUTPUT);
   // Set to LOW so no power is flowing through the moisture sensor
   digitalWrite(MOISTURE_POWER_PIN, LOW);
-  // Check gateway for metric setting
-  boolean metric = getConfig().isMetric;
+  // Check controller for metric setting
+  metric = getControllerConfig().isMetric;
 }
 
 void presentation()
