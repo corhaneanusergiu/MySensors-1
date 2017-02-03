@@ -8,6 +8,7 @@
   V2.1 - Minor formatting changes
   V3.0 - Refactor and added timer logic
   V3.1 - Updated gateway metric logic
+  V3.2 - Improved resend function
 */
 
 //*** EXTERNAL LIBRARIES **********************************
@@ -17,6 +18,15 @@
 #include <elapsedMillis.h>
 
 //*** MY SENSORS ******************************************
+
+// Enable MY_SPECIAL_DEBUG in sketch to activate I_DEBUG messages if MY_DEBUG is disabled
+// I_DEBUG requests are:
+// R: routing info (only repeaters): received msg XXYY (as stream), where XX is the node and YY the routing node
+// V: CPU voltage
+// F: CPU frequency
+// M: free memory
+// E: clear MySensors EEPROM area and reboot (i.e. "factory" reset)
+// #define MY_SPECIAL_DEBUG
 
 // Enable debug prints
 // #define MY_DEBUG
@@ -28,8 +38,11 @@
 // #define MY_PARENT_NODE_ID 0
 // #define MY_PARENT_NODE_IS_STATIC
 
+// Time to wait for messages default is 500ms
+// #define MY_SMART_SLEEP_WAIT_DURATION_MS (1000ul)
+
 // Transport ready boot timeout default is 0 meaning no timeout
-// Set to 60 seconds on battery nodes to avoid excess drainage
+// Set to 30 seconds on battery nodes to avoid excess drainage
 // #define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
 
 // Transport ready loop timeout default is 10 seconds
@@ -40,13 +53,13 @@
 #define MY_RADIO_NRF24
 // #define MY_RADIO_RFM69
 
-// Override RF24L01 channel number
+// Override RF24L01 channel number default is 125
 // #define MY_RF24_CHANNEL 125
 
-// Override RF24L01 module PA level
+// Override RF24L01 module PA level default is max
 // #define MY_RF24_PA_LEVEL RF24_PA_LOW
 
-// Override RF24L01 datarate
+// Override RF24L01 datarate default is 250Kbps
 // #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
@@ -58,7 +71,7 @@
 
 #define SKETCH_NAME "Shed"
 #define SKETCH_MAJOR_VER "3"
-#define SKETCH_MINOR_VER "1"
+#define SKETCH_MINOR_VER "2"
 
 // Define the sensor child IDs
 #define CHILD_ID1 1 // Temperature
@@ -238,24 +251,13 @@ void loop()
   }
 }
 
-void resend(MyMessage& msg, int repeats)
+void resend(MyMessage &msg, int repeats)
 {
-  int repeat = 0;
-  int repeat_delay = 0;
-  boolean send_ok = false;
-  while ((send_ok == false) and (repeat < radio_retries)) {
-    if (send(msg)) {
-      send_ok = true;
-    }
-    else {
-      send_ok = false;
-      repeat_delay += random(50, 200);
-#ifdef MY_DEBUG
-      Serial.print(F("Send ERROR "));
-      Serial.println(repeat);
-#endif
-    }
+  int repeat = 1;
+  int repeatDelay = 0;
+  while ((!send(msg)) and (repeat < repeats)) {
+    repeatDelay += 100;
     repeat++;
-    wait(repeat_delay);
+    wait(repeatDelay);
   }
 }

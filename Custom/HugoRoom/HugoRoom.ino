@@ -6,6 +6,7 @@
   V1.3 - Corrected sensor child ID bug
   V1.4 - Removed OTA lines (Not needed) + slight code cleanup
   V1.5 - Refactor code and introduce timer logic
+  V1.6 - Added resend function
 */
 
 //*** EXTERNAL LIBRARIES **********************************
@@ -14,6 +15,14 @@
 #include <elapsedMillis.h>
 
 //*** MYSENSORS *******************************************
+
+// Enable MY_SPECIAL_DEBUG in sketch to activate I_DEBUG messages if MY_DEBUG is disabled
+// I_DEBUG requests are:
+// R: routing info (only repeaters): received msg XXYY (as stream), where XX is the node and YY the routing node
+// V: CPU voltage
+// F: CPU frequency
+// M: free memory
+// E: clear MySensors EEPROM area and reboot (i.e. "factory" reset)
 
 // Enable debug prints
 // #define MY_DEBUG
@@ -25,17 +34,28 @@
 #define MY_PARENT_NODE_ID 0
 #define MY_PARENT_NODE_IS_STATIC
 
+// Time to wait for messages default is 500ms
+// #define MY_SMART_SLEEP_WAIT_DURATION_MS (1000ul)
+
+// Transport ready boot timeout default is 0 meaning no timeout
+// Set to 30 seconds on battery nodes to avoid excess drainage
+// #define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
+
+// Transport ready loop timeout default is 10 seconds
+// Usually left at default but can be extended if required
+// #define MY_SLEEP_TRANSPORT_RECONNECT_TIMEOUT_MS (10*1000UL)
+
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
 // #define MY_RADIO_RFM69
 
-// Override RF24L01 channel number
+// Override RF24L01 channel number default is 125
 // #define MY_RF24_CHANNEL 125
 
-// Override RF24L01 module PA level
+// Override RF24L01 module PA level default is max
 // #define MY_RF24_PA_LEVEL RF24_PA_LOW
 
-// Override RF24L01 datarate
+// Override RF24L01 datarate default is 250Kbps
 // #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
@@ -47,7 +67,6 @@
 
 #define SKETCH_NAME "Hugo Bedroom"
 #define SKETCH_MAJOR_VER "1"
-#define SKETCH_MINOR_VER "5"
 
 // Define the sensor child IDs
 #define CHILD_ID1 1 // Temperature
@@ -72,12 +91,8 @@ boolean last_motion = 0;
 DHT dht;
 
 // Define timers as global so they will not reset each loop
-elapsedMillis time_elapsed_temperature;
-elapsedMillis time_elapsed_humidity;
 
 // Force send updates of temperature and humidity after x milliseconds
-#define TIMER_TEMPERATURE 600000
-#define TIMER_HUMIDITY 600000
 
 // Change to trigger reading update
 #define THRESHOLD_TEMPERATURE 2
@@ -130,15 +145,11 @@ void loop()
 #endif
 #ifdef MY_DEBUG
   Serial.print("Temperature timer: ");
-  Serial.println(time_elapsed_temperature / 1000);
 #endif
   if (isnan(temperature)) {
     Serial.println("Failed to read temperature");
   }
-  else if (temperature_difference > THRESHOLD_TEMPERATURE || time_elapsed_temperature > TIMER_TEMPERATURE) {
     last_temperature = temperature;
-    time_elapsed_temperature = 0;
-    send(msg1.set(temperature, 1));
   }
 
   // *** DHT SENSOR ****************************************
@@ -159,15 +170,11 @@ void loop()
 #endif
 #ifdef MY_DEBUG
   Serial.print("Humidity timer : ");
-  Serial.println(time_elapsed_humidity / 1000);
 #endif
   if (isnan(temperature)) {
     Serial.println("Failed to read humidity");
   }
-  else if (humidity_Difference > THRESHOLD_HUMIDITY || time_elapsed_humidity > TIMER_HUMIDITY) {
     last_humidity = humidity;
-    time_elapsed_humidity = 0;
-    send(msg2.set(humidity, 1));
   }
 
   // *** PIR SENSOR ****************************************

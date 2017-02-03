@@ -13,6 +13,15 @@
 
 //*** MYSENSORS *******************************************
 
+// Enable MY_SPECIAL_DEBUG in sketch to activate I_DEBUG messages if MY_DEBUG is disabled
+// I_DEBUG requests are:
+// R: routing info (only repeaters): received msg XXYY (as stream), where XX is the node and YY the routing node
+// V: CPU voltage
+// F: CPU frequency
+// M: free memory
+// E: clear MySensors EEPROM area and reboot (i.e. "factory" reset)
+// #define MY_SPECIAL_DEBUG
+
 // Enable debug serial prints
 // #define MY_DEBUG
 
@@ -23,9 +32,12 @@
 // #define MY_PARENT_NODE_ID 1
 // #define MY_PARENT_NODE_IS_STATIC
 
+// Time to wait for messages default is 500ms
+// #define MY_SMART_SLEEP_WAIT_DURATION_MS (1000ul)
+
 // Transport ready boot timeout default is 0 meaning no timeout
-// Set to 60 seconds on battery nodes to avoid excess drainage
-#define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
+// Set to 30 seconds on battery nodes to avoid excess drainage
+#define MY_TRANSPORT_WAIT_READY_MS (30*1000UL)
 
 // Transport ready loop timeout default is 10 seconds
 // Usually left at default but can be extended if required
@@ -35,13 +47,13 @@
 #define MY_RADIO_NRF24
 // #define MY_RADIO_RFM69
 
-// Override RF24L01 channel number
+// Override RF24L01 channel number default is 125
 // #define MY_RF24_CHANNEL 125
 
-// Override RF24L01 module PA level
+// Override RF24L01 module PA level default is max
 // #define MY_RF24_PA_LEVEL RF24_PA_LOW
 
-// Override RF24L01 datarate
+// Override RF24L01 datarate default is 250Kbps
 // #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
@@ -87,13 +99,17 @@ const float vcc_max = 2.0 * 1.5;
 const float vcc_correction = 2.88 / 2.82;
 Vcc vcc(vcc_correction);
 
+// Define radio retries upon failure
+int radio_retries = 10;
+
+
 // *** BEGIN **********************************************
 
 void setup()
 {
   // Setup the contact sensor
   pinMode(PRIMARY_BUTTON_PIN, INPUT);
-  // Activate or deactivate the internal pull-up - high if using internal resistor or low if using external
+  // Activate or deactivate the internal pull-up high if using internal resistor or low if using external
   digitalWrite(PRIMARY_BUTTON_PIN, LOW);
 }
 
@@ -109,12 +125,12 @@ void presentation()
 
 void loop()
 {
-  // Debouce using sleep
-  sleep(DEBOUNCE_SLEEP);
+  // Debouce using wait or sleep
+  wait(DEBOUNCE_SLEEP);
   int value = digitalRead(PRIMARY_BUTTON_PIN);
   // If value has changed send the updated value
   if (value != old_value) {
-    send(msg.set(value == HIGH ? 0 : 1));
+    resend(msg.set(value == HIGH ? 0 : 1), radio_retries);
     old_value = value;
   }
   // Read battery voltage
@@ -130,9 +146,20 @@ void loop()
   Serial.println("%");
 #endif
   // Send battery readings
-  send(msg2.set(battery_voltage, 2));
-  send(msg3.set(battery_percent, 1));
+  resend(msg2.set(battery_voltage, 2), radio_retries);
+  resend(msg3.set(battery_percent, 2), radio_retries);
   sendBatteryLevel(battery_percent);
   // Sleep until either interupt change or timer reaches zero
   smartSleep(PRIMARY_BUTTON_PIN - 2, CHANGE, SLEEP_IN_MS);
+}
+
+void resend(MyMessage &msg, int repeats)
+{
+  int repeat = 1;
+  int repeatDelay = 0;
+  while ((!send(msg)) and (repeat < repeats)) {
+    repeatDelay += 100;
+    repeat++;
+    wait(repeatDelay);
+  }
 }
