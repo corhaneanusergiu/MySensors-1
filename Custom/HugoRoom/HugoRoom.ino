@@ -23,6 +23,7 @@
 // F: CPU frequency
 // M: free memory
 // E: clear MySensors EEPROM area and reboot (i.e. "factory" reset)
+// #define MY_SPECIAL_DEBUG
 
 // Enable debug prints
 // #define MY_DEBUG
@@ -67,6 +68,7 @@
 
 #define SKETCH_NAME "Hugo Bedroom"
 #define SKETCH_MAJOR_VER "1"
+#define SKETCH_MINOR_VER "6"
 
 // Define the sensor child IDs
 #define CHILD_ID1 1 // Temperature
@@ -77,6 +79,7 @@
 MyMessage msg1(CHILD_ID1, V_TEMP);
 MyMessage msg2(CHILD_ID2, V_HUM);
 MyMessage msg3(CHILD_ID3, V_TRIPPED);
+
 
 // *** SENSORS CONFIG *************************************
 
@@ -91,8 +94,12 @@ boolean last_motion = 0;
 DHT dht;
 
 // Define timers as global so they will not reset each loop
+elapsedMillis timeElapsedTemperature;
+elapsedMillis timeElapsedHumidity;
 
 // Force send updates of temperature and humidity after x milliseconds
+#define TIMER_TEMPERATURE 1000
+#define TIMER_HUMIDITY 1000
 
 // Change to trigger reading update
 #define THRESHOLD_TEMPERATURE 2
@@ -104,14 +111,17 @@ float last_temperature;
 // Store last humidity for comparison
 float last_humidity;
 
+// Define radio retries upon failure
+int radio_retries = 10;
+
 // *** BEGIN **********************************************
 
 void setup()
 {
-  // Set DHT pin
-  dht.setup(DHT_DIGITAL_PIN);
   // Set PIR pin to input
   pinMode(PIR_DIGITAL_PIN, INPUT);
+  // Set DHT pin
+  dht.setup(DHT_DIGITAL_PIN);
 }
 
 void presentation()
@@ -145,11 +155,15 @@ void loop()
 #endif
 #ifdef MY_DEBUG
   Serial.print("Temperature timer: ");
+  Serial.println(timeElapsedTemperature / 1000);
 #endif
   if (isnan(temperature)) {
     Serial.println("Failed to read temperature");
   }
+  else if (temperature_difference > THRESHOLD_TEMPERATURE || timeElapsedTemperature > TIMER_TEMPERATURE) {
     last_temperature = temperature;
+    timeElapsedTemperature = 0;
+    resend(msg1.set(temperature, 1), radio_retries);
   }
 
   // *** DHT SENSOR ****************************************
@@ -170,11 +184,15 @@ void loop()
 #endif
 #ifdef MY_DEBUG
   Serial.print("Humidity timer : ");
+  Serial.println(timeElapsedHumidity / 1000);
 #endif
   if (isnan(temperature)) {
     Serial.println("Failed to read humidity");
   }
+  else if (humidity_Difference > THRESHOLD_HUMIDITY || timeElapsedHumidity > TIMER_HUMIDITY) {
     last_humidity = humidity;
+    timeElapsedHumidity = 0;
+    resend(msg2.set(humidity, 1), radio_retries);
   }
 
   // *** PIR SENSOR ****************************************
@@ -189,5 +207,16 @@ void loop()
     last_motion = motion;
     // Send motion value value to gateway
     send(msg3.set(motion ? "1" : "0"));
+  }
+}
+
+void resend(MyMessage & msg, int repeats)
+{
+  int repeat = 1;
+  int repeatDelay = 0;
+  while ((!send(msg)) and (repeat < repeats)) {
+    repeatDelay += 100;
+    repeat++;
+    wait(repeatDelay);
   }
 }
