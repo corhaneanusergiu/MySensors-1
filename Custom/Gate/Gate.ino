@@ -1,133 +1,165 @@
-/**
-   The MySensors Arduino library handles the wireless radio link and protocol
-   between your home built sensors/actuators and HA controller of choice.
-   The sensors forms a self healing radio network with optional repeaters. Each
-   repeater and gateway builds a routing tables in EEPROM which keeps track of the
-   network topology allowing messages to be routed to nodes.
-
-   Created by Henrik Ekblad <henrik.ekblad@mysensors.org>
-   Copyright (C) 2013-2015 Sensnology AB
-   Full contributor list: https://github.com/mysensors/Arduino/graphs/contributors
-
-   Documentation: http://www.mysensors.org
-   Support Forum: http://forum.mysensors.org
-
-   This program is free software; you can redistribute it and/or
-   modify it under the terms of the GNU General Public License
-   version 2 as published by the Free Software Foundation.
-
- *******************************
-
-   DESCRIPTION
-
-   Interrupt driven binary switch example with dual interrupts
-   Author: Patrick 'Anticimex' Fallberg
-   Connect one button or door/window reed switch between
-   digitial I/O pin 3 (BUTTON_PIN below) and GND and the other
-   one in similar fashion on digital I/O pin 2.
-   This example is designed to fit Arduino Nano/Pro Mini
-
+/*
+  REVISION HISTORY
+  Created by Mark Swift
+  V1.2 - Added sleep time to force daily update
+  V1.3 - Deactivate pullup on setup and added old_value logic
+  V1.4 - Added daily wakeup to sleep
+  V1.5 - Code cleanup
 */
 
-// Enable debug prints to serial monitor
-#define MY_DEBUG
+//*** EXTERNAL LIBRARIES **********************************
+
+#include <Vcc.h>
+
+//*** MYSENSORS *******************************************
+
+// Enable MY_SPECIAL_DEBUG in sketch to activate I_DEBUG messages if MY_DEBUG is disabled
+// I_DEBUG requests are:
+// R: routing info (only repeaters): received msg XXYY (as stream), where XX is the node and YY the routing node
+// V: CPU voltage
+// F: CPU frequency
+// M: free memory
+// E: clear MySensors EEPROM area and reboot (i.e. "factory" reset)
+// #define MY_SPECIAL_DEBUG
+
+// Enable debug serial prints
+// #define MY_DEBUG
+
+// Lower serial speed if using 1Mhz clock
+// #define MY_BAUD_RATE 9600
 
 #define MY_NODE_ID 4
-#define MY_PARENT_NODE_ID 1 // 1 / AUTO
-#define MY_PARENT_NODE_IS_STATIC
-// #define MY_BAUD_RATE 9600 // For us with 1Mhz modules
+// #define MY_PARENT_NODE_ID 1
+// #define MY_PARENT_NODE_IS_STATIC
+
+// Time to wait for messages default is 500ms
+// #define MY_SMART_SLEEP_WAIT_DURATION_MS (1000ul)
+
+// Transport ready boot timeout default is 0 meaning no timeout
+// Set to 30 seconds on battery nodes to avoid excess drainage
+#define MY_TRANSPORT_WAIT_READY_MS (30*1000UL)
+
+// Transport ready loop timeout default is 10 seconds
+// Usually left at default but can be extended if required
+// #define MY_SLEEP_TRANSPORT_RECONNECT_TIMEOUT_MS (10*1000UL)
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
-//#define MY_RADIO_RFM69
+// #define MY_RADIO_RFM69
+
+// Override RF24L01 channel number default is 125
+// #define MY_RF24_CHANNEL 125
+
+// Override RF24L01 module PA level default is max
+// #define MY_RF24_PA_LEVEL RF24_PA_LOW
+
+// Override RF24L01 datarate default is 250Kbps
+// #define MY_RF24_DATARATE RF24_250KBPS
+
+// Enabled repeater feature for this node
+// #define MY_REPEATER_FEATURE
 
 #include <MySensors.h>
-#include <Vcc.h>
+
+// *** SKETCH CONFIG **************************************
 
 #define SKETCH_NAME "Door Sensor"
 #define SKETCH_MAJOR_VER "1"
-#define SKETCH_MINOR_VER "1"
+#define SKETCH_MINOR_VER "5"
 
-#define CHILD_ID1 1
-#define CHILD_ID2 2
-#define CHILD_ID3 3
+// Define the sensor child IDs
+#define CHILD_ID1 1 // Switch
+#define CHILD_ID2 2 // Battery voltage
+#define CHILD_ID3 3 // Battery percent
 
-#define PRIMARY_BUTTON_PIN 3   // Arduino Digital I/O pin for button / reed switch
-
+// Define the message formats
 MyMessage msg(CHILD_ID1, V_TRIPPED);
 MyMessage msg2(CHILD_ID2, V_CUSTOM);
 MyMessage msg3(CHILD_ID3, V_CUSTOM);
 
-const float VccMin        = 2.0 * 0.9; // Minimum expected Vcc level, in Volts. Example for 2xAA Alkaline.
-const float VccMax        = 2.0 * 1.5; // Maximum expected Vcc level, in Volts. Example for 2xAA Alkaline.
-const float VccCorrection = 2.88 / 2.82; // Measured Vcc by multimeter divided by reported Vcc
-Vcc vcc(VccCorrection);
+// *** SENSORS CONFIG *************************************
 
-uint8_t value;
+// Digital I/O pin for button or reed switch
+#define PRIMARY_BUTTON_PIN 3
+
+// Debounce using a small sleep
+#define DEBOUNCE_SLEEP 5
+
+// Sleep timer in milliseconds
+#define SLEEP_IN_MS 86400000UL
+
+// Store the old value for comparison
+int old_value = -1;
+
+// Minimum expected vcc level, in volts (2xAA alkaline)
+const float vcc_min = 2.0 * 0.9;
+// Maximum expected vcc level, in volts (2xAA alkaline)
+const float vcc_max = 2.0 * 1.5;
+// Measured vcc by multimeter divided by reported vcc
+const float vcc_correction = 2.88 / 2.82;
+Vcc vcc(vcc_correction);
+
+// Define radio retries upon failure
+int radio_retries = 10;
+
+
+// *** BEGIN **********************************************
 
 void setup()
 {
   // Setup the contact sensor
   pinMode(PRIMARY_BUTTON_PIN, INPUT);
-
-  // Activate internal pull-ups
-  // digitalWrite(PRIMARY_BUTTON_PIN, HIGH);
+  // Activate or deactivate the internal pull-up high if using internal resistor or low if using external
+  digitalWrite(PRIMARY_BUTTON_PIN, LOW);
 }
 
-void presentation() {
-  // Send the sketch version information to the gateway and Controller
+void presentation()
+{
+  // Send the sketch version information to the gateway and controller
   sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
-
-  // Register binary input sensor to sensor_node (they will be created as child devices)
-  // You can use S_DOOR, S_MOTION or S_LIGHT here depending on your usage.
-  // If S_LIGHT is used, remember to update variable type you send in. See "msg" above.
+  // Register all sensors to the gateway
   present(CHILD_ID1, S_DOOR);
   present(CHILD_ID2, S_CUSTOM);
   present(CHILD_ID3, S_CUSTOM);
 }
 
-// Loop will iterate on changes on the BUTTON_PINs
 void loop()
 {
+  // Debouce using wait or sleep
+  wait(DEBOUNCE_SLEEP);
+  int value = digitalRead(PRIMARY_BUTTON_PIN);
+  // If value has changed send the updated value
+  if (value != old_value) {
+    resend(msg.set(value == HIGH ? 0 : 1), radio_retries);
+    old_value = value;
+  }
+  // Read battery voltage
+  float battery_voltage = vcc.Read_Volts();
+  // Calculate battery percentage
+  float battery_percent = vcc.Read_Perc(vcc_min, vcc_max);
 #ifdef MY_DEBUG
-  Serial.print("Waking");
-#endif
-  // uint8_t value;
-  // static uint8_t sentValue = 2;
-
-  // Short delay to allow buttons to properly settle
-  sleep(5);
-
-  value = digitalRead(PRIMARY_BUTTON_PIN);
-
-  // if (value != sentValue) {
-  // Value has changed from last transmission, send the updated value
-  send(msg.set(value == HIGH ? 0 : 1 ));
-  // sentValue = value;
-  //}
-
-  float v = vcc.Read_Volts();
-#ifdef MY_DEBUG
-  Serial.print("VCC = ");
-  Serial.print(v);
+  Serial.print("Battery = ");
+  Serial.print(battery_voltage);
   Serial.println(" Volts");
-#endif
-
-  float p = vcc.Read_Perc(VccMin, VccMax);
-#ifdef MY_DEBUG
-  Serial.print("VCC = ");
-  Serial.print(p);
+  Serial.print("Battery = ");
+  Serial.print(battery_percent);
   Serial.println("%");
 #endif
+  // Send battery readings
+  resend(msg2.set(battery_voltage, 2), radio_retries);
+  resend(msg3.set(battery_percent, 2), radio_retries);
+  sendBatteryLevel(battery_percent);
+  // Sleep until either interupt change or timer reaches zero
+  smartSleep(PRIMARY_BUTTON_PIN - 2, CHANGE, SLEEP_IN_MS);
+}
 
-  send(msg2.set(v, 2));
-  send(msg3.set(p, 1));
-  sendBatteryLevel(p);
-
-  // Sleep until something happens with the sensor
-
-#ifdef MY_DEBUG
-  Serial.print("Sleeping");
-#endif
-  smartSleep(PRIMARY_BUTTON_PIN - 2, CHANGE, 0);
+void resend(MyMessage &msg, int repeats)
+{
+  int repeat = 1;
+  int repeatDelay = 0;
+  while ((!send(msg)) and (repeat < repeats)) {
+    repeatDelay += 100;
+    repeat++;
+    wait(repeatDelay);
+  }
 }

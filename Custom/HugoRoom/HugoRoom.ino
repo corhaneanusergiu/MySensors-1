@@ -1,88 +1,134 @@
 /*
   REVISION HISTORY
   Created by Mark Swift
-  V1.1 - Cleaned up code.
-  V1.2 - Added PIR sensor.
-  V1.3 - Corrected sensor child ID bug.
+  V1.1 - Cleaned up code
+  V1.2 - Added PIR sensor
+  V1.3 - Corrected sensor child ID bug
+  V1.4 - Removed OTA lines (Not needed) + slight code cleanup
+  V1.5 - Refactor code and introduce timer logic
+  V1.6 - Added resend function
 */
 
-#include <DHT.h>
+//*** EXTERNAL LIBRARIES **********************************
 
-//*** MY SENSORS ******************************************
+#include <DHT.h>
+#include <elapsedMillis.h>
+
+//*** MYSENSORS *******************************************
+
+// Enable MY_SPECIAL_DEBUG in sketch to activate I_DEBUG messages if MY_DEBUG is disabled
+// I_DEBUG requests are:
+// R: routing info (only repeaters): received msg XXYY (as stream), where XX is the node and YY the routing node
+// V: CPU voltage
+// F: CPU frequency
+// M: free memory
+// E: clear MySensors EEPROM area and reboot (i.e. "factory" reset)
+// #define MY_SPECIAL_DEBUG
 
 // Enable debug prints
 // #define MY_DEBUG
 
+// Lower serial speed if using 1Mhz clock
+// #define MY_BAUD_RATE 9600
+
 #define MY_NODE_ID 1
-#define MY_PARENT_NODE_ID 0 // AUTO
-// #define MY_PARENT_NODE_IS_STATIC
-// #define MY_BAUD_RATE 9600 // For us with 1Mhz modules
+#define MY_PARENT_NODE_ID 0
+#define MY_PARENT_NODE_IS_STATIC
+
+// Time to wait for messages default is 500ms
+// #define MY_SMART_SLEEP_WAIT_DURATION_MS (1000ul)
+
+// Transport ready boot timeout default is 0 meaning no timeout
+// Set to 30 seconds on battery nodes to avoid excess drainage
+// #define MY_TRANSPORT_WAIT_READY_MS (60*1000UL)
+
+// Transport ready loop timeout default is 10 seconds
+// Usually left at default but can be extended if required
+// #define MY_SLEEP_TRANSPORT_RECONNECT_TIMEOUT_MS (10*1000UL)
 
 // Enable and select radio type attached
 #define MY_RADIO_NRF24
 // #define MY_RADIO_RFM69
 
-// Set RF24L01 channel number
+// Override RF24L01 channel number default is 125
 // #define MY_RF24_CHANNEL 125
 
-// For crappy PA+LNA module
+// Override RF24L01 module PA level default is max
 // #define MY_RF24_PA_LEVEL RF24_PA_LOW
+
+// Override RF24L01 datarate default is 250Kbps
+// #define MY_RF24_DATARATE RF24_250KBPS
 
 // Enabled repeater feature for this node
 #define MY_REPEATER_FEATURE
 
-// Enables OTA firmware updates
-// #define MY_OTA_FIRMWARE_FEATURE
-
 #include <MySensors.h>
 
-//*** CONFIG **********************************************
+// *** SKETCH CONFIG **************************************
 
-// Define DHT22 pin
-#define DHT_DIGITAL_PIN 3
-// Send temperature only if changed? 1 = Yes 0 = No
-#define COMPARE_TEMP 0
-// Send humidity only if changed? 1 = Yes 0 = No
-#define COMPARE_HUM 0
-// Set DHT process name
-DHT dht;
-// Store last temperature for comparisons
-float lastTemp;
-// Store last humidity for comparisons
-float lastHum;
-// Set default setting for reading formats
-boolean metric = true;
-
-// PIR sensor
-#define PIR_DIGITAL_PIN 2 // The digital input you attached your motion sensor
-
-// Define the loop delay
-#define LOOP_TIME 30000 // Sleep time between reads (in milliseconds)
+#define SKETCH_NAME "Hugo Bedroom"
+#define SKETCH_MAJOR_VER "1"
+#define SKETCH_MINOR_VER "6"
 
 // Define the sensor child IDs
 #define CHILD_ID1 1 // Temperature
 #define CHILD_ID2 2 // Humidity
-#define CHILD_ID3 3 // PIR
+#define CHILD_ID3 3 // Motion
 
 // Define the message formats
 MyMessage msg1(CHILD_ID1, V_TEMP);
 MyMessage msg2(CHILD_ID2, V_HUM);
 MyMessage msg3(CHILD_ID3, V_TRIPPED);
 
-//*********************************************************
+
+// *** SENSORS CONFIG *************************************
+
+// Motion sensor pin
+#define PIR_DIGITAL_PIN 2
+// Store last motion status for comparison
+boolean last_motion = 0;
+
+// DHT sensor pin
+#define DHT_DIGITAL_PIN 3
+// Set DHT process name
+DHT dht;
+
+// Define timers as global so they will not reset each loop
+elapsedMillis timeElapsedTemperature;
+elapsedMillis timeElapsedHumidity;
+
+// Force send updates of temperature and humidity after x milliseconds
+#define TIMER_TEMPERATURE 1000
+#define TIMER_HUMIDITY 1000
+
+// Change to trigger reading update
+#define THRESHOLD_TEMPERATURE 2
+// Change to trigger reading update
+#define THRESHOLD_HUMIDITY 10
+
+// Store last temperature for comparison
+float last_temperature;
+// Store last humidity for comparison
+float last_humidity;
+
+// Define radio retries upon failure
+int radio_retries = 10;
+
+// *** BEGIN **********************************************
 
 void setup()
 {
-  dht.setup(DHT_DIGITAL_PIN);
-  metric = getConfig().isMetric;
+  // Set PIR pin to input
   pinMode(PIR_DIGITAL_PIN, INPUT);
+  // Set DHT pin
+  dht.setup(DHT_DIGITAL_PIN);
 }
 
 void presentation()
 {
-  // Send the Sketch Version Information to the Gateway
-  sendSketchInfo("Hugo's Room", "1.3");
-  // Register all sensors to the gateway (they will be created as child devices)
+  // Send the sketch version information to the gateway and controller
+  sendSketchInfo(SKETCH_NAME, SKETCH_MAJOR_VER "." SKETCH_MINOR_VER);
+  // Register all sensors to the gateway
   present(CHILD_ID1, S_TEMP);
   present(CHILD_ID2, S_HUM);
   present(CHILD_ID3, S_MOTION);
@@ -90,65 +136,87 @@ void presentation()
 
 void loop()
 {
+  // *** DHT SENSOR ***************************************
 
-  //*** DHT SENSOR ****************************************
-
-  wait(dht.getMinimumSamplingPeriod()); // Delay or wait (repeater)
-
-  // Fetch temperatures from DHT sensor
+  wait(dht.getMinimumSamplingPeriod());
+  // Fetch temperature from DHT sensor
   float temperature = dht.getTemperature();
-
-  if (isnan(temperature))
-  {
-    Serial.println("Failed reading temperature from DHT");
-  }
-#if COMPARE_TEMP == 1
-  else if (temperature != lastTemp)
-#endif
-  {
-    lastTemp = temperature;
-    if (!metric)
-    {
-      temperature = dht.toFahrenheit(temperature);
-    }
-    send(msg1.set(temperature, 1));
+  // The absolute difference
+  float temperature_difference = temperature - last_temperature;
+  // 'abs' is the absolute value, the result is always positive
+  temperature_difference = abs(temperature_difference);
 #ifdef MY_DEBUG
-    Serial.print("T: ");
-    Serial.println(temperature);
+  Serial.print("Temperature: ");
+  Serial.println(temperature);
 #endif
+#ifdef MY_DEBUG
+  Serial.print("Temperature difference: ");
+  Serial.println(temperature_difference);
+#endif
+#ifdef MY_DEBUG
+  Serial.print("Temperature timer: ");
+  Serial.println(timeElapsedTemperature / 1000);
+#endif
+  if (isnan(temperature)) {
+    Serial.println("Failed to read temperature");
   }
+  else if (temperature_difference > THRESHOLD_TEMPERATURE || timeElapsedTemperature > TIMER_TEMPERATURE) {
+    last_temperature = temperature;
+    timeElapsedTemperature = 0;
+    resend(msg1.set(temperature, 1), radio_retries);
+  }
+
+  // *** DHT SENSOR ****************************************
 
   // Fetch humidity from DHT sensor
   float humidity = dht.getHumidity();
-
-  if (isnan(humidity))
-  {
+  // The absolute difference
+  float humidity_Difference = humidity - last_humidity;
+  // 'abs' is the absolute value, the result is always positive
+  humidity_Difference = abs(humidity_Difference);
 #ifdef MY_DEBUG
-    Serial.println("Failed reading humidity from DHT");
+  Serial.print("Humidity: ");
+  Serial.println(humidity);
 #endif
-  }
-#if COMPARE_HUM == 1
-  else if (humidity != lastHum)
-#endif
-  {
-    lastHum = humidity;
-    send(msg2.set(humidity, 1));
 #ifdef MY_DEBUG
-    Serial.print("H: ");
-    Serial.println(humidity);
+  Serial.print("Humidity difference: ");
+  Serial.println(humidity_Difference);
 #endif
+#ifdef MY_DEBUG
+  Serial.print("Humidity timer : ");
+  Serial.println(timeElapsedHumidity / 1000);
+#endif
+  if (isnan(temperature)) {
+    Serial.println("Failed to read humidity");
+  }
+  else if (humidity_Difference > THRESHOLD_HUMIDITY || timeElapsedHumidity > TIMER_HUMIDITY) {
+    last_humidity = humidity;
+    timeElapsedHumidity = 0;
+    resend(msg2.set(humidity, 1), radio_retries);
   }
 
-  //*** PIR SENSOR ****************************************
+  // *** PIR SENSOR ****************************************
 
   // Read digital motion value
-  boolean tripped = digitalRead(PIR_DIGITAL_PIN) == HIGH;
-
+  boolean motion = digitalRead(PIR_DIGITAL_PIN) == HIGH;
+  if (last_motion != motion) {
 #ifdef MY_DEBUG
-  Serial.print("PIR: ");
-  Serial.println(tripped);
+    Serial.print("Motion: ");
+    Serial.println(motion);
 #endif
-  send(msg3.set(tripped ? "1" : "0")); // Send tripped value to gateway
+    last_motion = motion;
+    // Send motion value value to gateway
+    send(msg3.set(motion ? "1" : "0"));
+  }
+}
 
-  wait(LOOP_TIME); // Sleep or wait (repeater)
+void resend(MyMessage & msg, int repeats)
+{
+  int repeat = 1;
+  int repeatDelay = 0;
+  while ((!send(msg)) and (repeat < repeats)) {
+    repeatDelay += 100;
+    repeat++;
+    wait(repeatDelay);
+  }
 }
